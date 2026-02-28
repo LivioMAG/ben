@@ -2,258 +2,303 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sales Funnel</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Elektro Karriere Funnel</title>
 <style>
-    :root {
-        --primary:#d50000;
-        --bg:#ffffff;
-        --text:#1a1a1a;
-        --muted:#6b6b6b;
-        --radius:18px;
-        --transition:0.3s ease;
-    }
-    *{box-sizing:border-box;margin:0;padding:0;font-family:"Inter",Arial,sans-serif;}
-    body{
-        min-height:100vh;
-        background:var(--bg);
-        color:var(--text);
-        display:flex;
-        justify-content:center;
-        align-items:center;
-        padding:24px;
-    }
-    .funnel-wrapper{
-        width:100%;
-        max-width:480px;
-        background:#fff;
-        border-radius:24px;
-        box-shadow:0 30px 80px rgba(213,0,0,0.12);
-        overflow:hidden;
-        border:1px solid rgba(213,0,0,0.1);
-    }
-    header{
-        background:var(--primary);
-        color:#fff;
-        padding:28px 32px;
-    }
-    header h1{
-        font-size:1.5rem;
-        font-weight:700;
-        line-height:1.2;
-    }
-    header p{
-        margin-top:8px;
-        opacity:0.85;
-    }
-    .content{
-        padding:32px;
-    }
-    .step{
-        display:none;
-        animation:fade var(--transition);
-    }
-    .step.active{
-        display:block;
-    }
-    @keyframes fade{
-        from{opacity:0;transform:translateY(10px);}
-        to{opacity:1;transform:translateY(0);}
-    }
-    .question{
-        font-size:1.3rem;
-        font-weight:600;
-        margin-bottom:24px;
-    }
-    .options{
-        display:grid;
-        gap:14px;
-    }
-    .option-btn{
-        padding:16px 18px;
-        border:2px solid rgba(213,0,0,0.18);
-        border-radius:var(--radius);
-        background:#fff;
-        font-size:1rem;
-        font-weight:600;
-        color:var(--text);
-        cursor:pointer;
-        transition:var(--transition);
-        text-align:left;
-    }
-    .option-btn:hover,
-    .option-btn.selected{
-        border-color:var(--primary);
-        color:var(--primary);
-        box-shadow:0 12px 25px rgba(213,0,0,0.12);
-        transform:translateY(-2px);
-    }
-    form{
-        display:flex;
-        flex-direction:column;
-        gap:18px;
-    }
-    label{
-        font-weight:600;
-        font-size:0.95rem;
-        color:var(--muted);
-    }
-    input{
-        width:100%;
-        padding:14px 16px;
-        border-radius:var(--radius);
-        border:2px solid rgba(0,0,0,0.08);
-        font-size:1rem;
-        transition:var(--transition);
-    }
-    input:focus{
-        border-color:var(--primary);
-        outline:none;
-        box-shadow:0 12px 25px rgba(213,0,0,0.12);
-    }
-    .primary-btn{
-        margin-top:8px;
-        padding:16px;
-        border:none;
-        border-radius:var(--radius);
-        background:var(--primary);
-        color:#fff;
-        font-size:1rem;
-        font-weight:600;
-        cursor:pointer;
-        transition:var(--transition);
-    }
-    .primary-btn:hover{
-        transform:translateY(-2px);
-        box-shadow:0 18px 35px rgba(213,0,0,0.25);
-    }
-    .thank-you, .not-eligible{
-        text-align:center;
-    }
-    .thank-you h2,
-    .not-eligible h2{
-        font-size:1.6rem;
-        margin-bottom:10px;
-        color:var(--primary);
-    }
-    .thank-you p,
-    .not-eligible p{
-        color:var(--muted);
-        line-height:1.5;
-    }
-    @media (max-width:480px){
-        header, .content{padding:24px;}
-        .question{font-size:1.15rem;}
-        .option-btn{font-size:0.95rem;}
-    }
+:root {
+  --primary:#e50914;
+  --bg:#ffffff;
+  --text:#1a1a1a;
+  --muted:#6c6c6c;
+  --border:#eeeeee;
+  --radius:18px;
+}
+*{box-sizing:border-box;font-family:"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
+body{
+  margin:0;
+  min-height:100vh;
+  background:var(--bg);
+  color:var(--text);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+.funnel{
+  width:100%;
+  max-width:520px;
+  background:#fff;
+  border-radius:var(--radius);
+  box-shadow:0 20px 60px rgba(0,0,0,0.08);
+  overflow:hidden;
+}
+.header{
+  padding:28px 28px 16px;
+  border-bottom:1px solid var(--border);
+}
+.logo{
+  font-weight:700;
+  letter-spacing:1px;
+  color:var(--primary);
+  font-size:18px;
+}
+.progress{
+  margin-top:18px;
+  height:6px;
+  background:#f5f5f5;
+  border-radius:999px;
+  overflow:hidden;
+}
+.progress__bar{
+  width:0%;
+  height:100%;
+  background:linear-gradient(90deg,var(--primary),#ff4d5a);
+  transition:width .4s ease;
+}
+.step{
+  display:none;
+  padding:32px 28px 36px;
+  animation:fade .35s ease;
+}
+.step.active{display:block;}
+@keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+h1{
+  margin:0 0 10px;
+  font-size:26px;
+}
+p.subtitle{
+  margin:0 0 28px;
+  color:var(--muted);
+}
+.options{
+  display:grid;
+  gap:14px;
+}
+.option{
+  border:1.5px solid var(--border);
+  border-radius:14px;
+  padding:18px;
+  font-weight:600;
+  cursor:pointer;
+  transition:.25s ease;
+}
+.option input{display:none;}
+.option.active{
+  border-color:var(--primary);
+  background:rgba(229,9,20,0.08);
+  color:var(--primary);
+}
+.exp-buttons{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:14px;
+}
+.exp-buttons button{
+  border:1.5px solid var(--border);
+  border-radius:14px;
+  padding:16px;
+  font-size:15px;
+  font-weight:600;
+  background:#fff;
+  cursor:pointer;
+  transition:.25s ease;
+}
+.exp-buttons button.selected,
+.exp-buttons button:hover{
+  border-color:var(--primary);
+  color:var(--primary);
+  background:rgba(229,9,20,0.08);
+}
+.form{
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.form label{
+  font-weight:600;
+  font-size:14px;
+}
+.form input{
+  padding:14px 16px;
+  border:1.5px solid var(--border);
+  border-radius:12px;
+  font-size:15px;
+  transition:.25s ease;
+}
+.form input:focus{
+  outline:none;
+  border-color:var(--primary);
+  box-shadow:0 0 0 3px rgba(229,9,20,0.15);
+}
+.btn{
+  margin-top:8px;
+  padding:16px;
+  border:none;
+  border-radius:14px;
+  font-weight:700;
+  font-size:15px;
+  cursor:pointer;
+  transition:.25s ease;
+}
+.btn.primary{
+  background:var(--primary);
+  color:#fff;
+  box-shadow:0 12px 30px rgba(229,9,20,0.35);
+}
+.btn:disabled{
+  opacity:.5;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+.final{
+  text-align:center;
+}
+.final .icon{
+  width:88px;
+  height:88px;
+  border-radius:50%;
+  background:rgba(229,9,20,0.1);
+  color:var(--primary);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:40px;
+  margin:0 auto 22px;
+}
+@media(max-width:520px){
+  body{padding:16px;}
+  .header,.step{padding:24px 20px;}
+  h1{font-size:22px;}
+}
 </style>
 </head>
 <body>
-<div class="funnel-wrapper">
-    <header>
-        <h1>Starte deine Elektro-Karriere</h1>
-        <p>Beantworte drei kurze Fragen, damit wir dich besser kennenlernen.</p>
-    </header>
-    <div class="content">
-        <div class="step active" data-step="1">
-            <div class="question">Welche Ausbildung hast du?</div>
-            <div class="options">
-                <button class="option-btn" data-answer="Elektroinstallateur">Elektroinstallateur</button>
-                <button class="option-btn" data-answer="Montage Elektriker">Montage Elektriker</button>
-                <button class="option-btn" data-answer="Ausbildung Elektrotechnik">Ausbildung in der Elektrotechnik</button>
-                <button class="option-btn" data-answer="Keine Ausbildung">Keine Ausbildung in diesem Bereich</button>
-            </div>
-        </div>
-        <div class="step" data-step="2">
-            <div class="question">Wie viel Berufserfahrung hast du?</div>
-            <div class="options">
-                <button class="option-btn" data-experience="0-1">0–1 Jahr</button>
-                <button class="option-btn" data-experience="1-3">1–3 Jahre</button>
-                <button class="option-btn" data-experience="3-5">3–5 Jahre</button>
-                <button class="option-btn" data-experience="5plus">Über 5 Jahre</button>
-            </div>
-        </div>
-        <div class="step" data-step="3">
-            <div class="question">Wie können wir dich erreichen?</div>
-            <form id="contactForm">
-        <label for="name">Name</label>
-        <input type="text" id="name" name="name" placeholder="Max Muster" required>
-        <label for="email">E-Mail-Adresse</label>
-        <input type="email" id="email" name="email" placeholder="max@beispiel.ch" required>
-        <button type="submit" class="primary-btn">Absenden</button>
-            </form>
-        </div>
-        <div class="step" data-step="thanks">
-            <div class="thank-you">
-                <h2>Vielen Dank!</h2>
-                <p>Wir haben deine Angaben erhalten und melden uns in Kürze bei dir.</p>
-            </div>
-        </div>
-        <div class="step" data-step="decline">
-            <div class="not-eligible">
-                <h2>Danke für dein Interesse!</h2>
-                <p>Aktuell konzentrieren wir uns auf Bewerbende mit einer Ausbildung in der Elektrotechnik. Melde dich gerne erneut, sobald du entsprechende Erfahrung gesammelt hast.</p>
-            </div>
-        </div>
+<section class="funnel">
+  <header class="header">
+    <div class="logo">ELEKTRO PRO</div>
+    <div class="progress"><div class="progress__bar" id="progressBar"></div></div>
+  </header>
+
+  <div class="step active" data-step="1">
+    <h1>Welche Ausbildung hast du?</h1>
+    <p class="subtitle">Wähle die Option, die am besten auf dich zutrifft.</p>
+    <div class="options" id="trainingOptions">
+      <label class="option">
+        <input type="radio" name="training" value="Elektroinstallateur">
+        Elektroinstallateur
+      </label>
+      <label class="option">
+        <input type="radio" name="training" value="Montage Elektriker">
+        Montage Elektriker
+      </label>
+      <label class="option">
+        <input type="radio" name="training" value="Ausbildung in der Elektrotechnik">
+        Ausbildung in der Elektrotechnik
+      </label>
+      <label class="option">
+        <input type="radio" name="training" value="Keine Ausbildung in diesem Bereich">
+        Keine Ausbildung in diesem Bereich
+      </label>
     </div>
-</div>
+    <button class="btn primary" id="toStep2" disabled>Weiter</button>
+  </div>
+
+  <div class="step" data-step="2">
+    <h1>Wie viel Berufserfahrung hast du?</h1>
+    <p class="subtitle">Ein Klick reicht aus.</p>
+    <div class="exp-buttons" id="experienceButtons">
+      <button data-exp="0-1">0–1 Jahr</button>
+      <button data-exp="1-3">1–3 Jahre</button>
+      <button data-exp="3-5">3–5 Jahre</button>
+      <button data-exp="5+">Über 5 Jahre</button>
+    </div>
+  </div>
+
+  <div class="step" data-step="3">
+    <h1>Wie erreichen wir dich?</h1>
+    <p class="subtitle">Bitte gib deine Kontaktdaten ein.</p>
+    <form class="form" id="contactForm">
+      <div>
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" placeholder="Dein Name" required>
+      </div>
+      <div>
+        <label for="email">E-Mail</label>
+        <input id="email" name="email" type="email" placeholder="name@mail.com" required>
+      </div>
+      <button class="btn primary" type="submit">Absenden</button>
+    </form>
+  </div>
+
+  <div class="step" data-step="4">
+    <div class="final">
+      <div class="icon">✓</div>
+      <h1>Danke für deine Angaben!</h1>
+      <p class="subtitle" id="finalMessage">Wir melden uns in Kürze mit weiteren Informationen.</p>
+    </div>
+  </div>
+</section>
 
 <script>
 const steps = document.querySelectorAll('.step');
-const stepMap = {
-    1: document.querySelector('[data-step="1"]'),
-    2: document.querySelector('[data-step="2"]'),
-    3: document.querySelector('[data-step="3"]'),
-    thanks: document.querySelector('[data-step="thanks"]'),
-    decline: document.querySelector('[data-step="decline"]')
-};
-const question1Btns = stepMap[1].querySelectorAll('.option-btn');
-const question2Btns = stepMap[2].querySelectorAll('.option-btn');
-const form = document.getElementById('contactForm');
+const progressBar = document.getElementById('progressBar');
+const toStep2Btn = document.getElementById('toStep2');
+const trainingOptions = document.querySelectorAll('#trainingOptions .option');
+const expButtons = document.querySelectorAll('#experienceButtons button');
+const finalMessage = document.getElementById('finalMessage');
+let formData = {training:null, experience:null, name:null, email:null};
 
-let answers = {
-    ausbildung: '',
-    erfahrung: '',
-    name: '',
-    email: ''
-};
-
-function showStep(id){
-    steps.forEach(step => step.classList.remove('active'));
-    stepMap[id].classList.add('active');
+function updateProgress(stepIndex){
+  const total = steps.length;
+  const percent = Math.min((stepIndex)/(total-1)*100,100);
+  progressBar.style.width = `${percent}%`;
 }
 
-question1Btns.forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-        answers.ausbildung = btn.dataset.answer;
-        question1Btns.forEach(b=>b.classList.remove('selected'));
-        btn.classList.add('selected');
-        if(btn.dataset.answer === 'Keine Ausbildung'){
-            showStep('decline');
-        }else{
-            showStep(2);
-        }
-    });
+function goToStep(number){
+  steps.forEach(step=>step.classList.remove('active'));
+  const target = document.querySelector(`.step[data-step="${number}"]`);
+  if(target){
+    target.classList.add('active');
+    updateProgress(number-1);
+  }
+}
+
+trainingOptions.forEach(option=>{
+  option.addEventListener('click',()=>{
+    trainingOptions.forEach(o=>o.classList.remove('active'));
+    option.classList.add('active');
+    const input = option.querySelector('input');
+    input.checked = true;
+    formData.training = input.value;
+    toStep2Btn.disabled = false;
+  });
 });
 
-question2Btns.forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-        answers.erfahrung = btn.dataset.experience;
-        question2Btns.forEach(b=>b.classList.remove('selected'));
-        btn.classList.add('selected');
-        showStep(3);
-    });
+toStep2Btn.addEventListener('click',()=>{
+  if(!formData.training) return;
+  if(formData.training === 'Keine Ausbildung in diesem Bereich'){
+    finalMessage.textContent = 'Danke für dein Interesse. Aktuell suchen wir Personen mit einer elektrotechnischen Ausbildung.';
+    goToStep(4);
+  }else{
+    finalMessage.textContent = 'Wir melden uns in Kürze mit weiteren Informationen.';
+    goToStep(2);
+  }
 });
 
-form.addEventListener('submit', e=>{
-    e.preventDefault();
-    const name = form.name.value.trim();
-    const email = form.email.value.trim();
-    if(!name || !email) return;
-    answers.name = name;
-    answers.email = email;
-    showStep('thanks');
-    form.reset();
+expButtons.forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    expButtons.forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    formData.experience = btn.dataset.exp;
+    goToStep(3);
+  });
+});
+
+document.getElementById('contactForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  formData.name = e.target.name.value.trim();
+  formData.email = e.target.email.value.trim();
+  goToStep(4);
 });
 </script>
 </body>
