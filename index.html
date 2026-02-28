@@ -3,302 +3,189 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Elektro Karriere Funnel</title>
+<title>Sale Funnel</title>
 <style>
-:root {
-  --primary:#e50914;
-  --bg:#ffffff;
-  --text:#1a1a1a;
-  --muted:#6c6c6c;
-  --border:#eeeeee;
-  --radius:18px;
-}
-*{box-sizing:border-box;font-family:"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;}
-body{
-  margin:0;
-  min-height:100vh;
-  background:var(--bg);
-  color:var(--text);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  padding:24px;
-}
-.funnel{
-  width:100%;
-  max-width:520px;
-  background:#fff;
-  border-radius:var(--radius);
-  box-shadow:0 20px 60px rgba(0,0,0,0.08);
-  overflow:hidden;
-}
-.header{
-  padding:28px 28px 16px;
-  border-bottom:1px solid var(--border);
-}
-.logo{
-  font-weight:700;
-  letter-spacing:1px;
-  color:var(--primary);
-  font-size:18px;
-}
-.progress{
-  margin-top:18px;
-  height:6px;
-  background:#f5f5f5;
-  border-radius:999px;
-  overflow:hidden;
-}
-.progress__bar{
-  width:0%;
-  height:100%;
-  background:linear-gradient(90deg,var(--primary),#ff4d5a);
-  transition:width .4s ease;
-}
-.step{
-  display:none;
-  padding:32px 28px 36px;
-  animation:fade .35s ease;
-}
-.step.active{display:block;}
-@keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
-h1{
-  margin:0 0 10px;
-  font-size:26px;
-}
-p.subtitle{
-  margin:0 0 28px;
-  color:var(--muted);
-}
-.options{
-  display:grid;
-  gap:14px;
-}
-.option{
-  border:1.5px solid var(--border);
-  border-radius:14px;
-  padding:18px;
-  font-weight:600;
-  cursor:pointer;
-  transition:.25s ease;
-}
-.option input{display:none;}
-.option.active{
-  border-color:var(--primary);
-  background:rgba(229,9,20,0.08);
-  color:var(--primary);
-}
-.exp-buttons{
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
-  gap:14px;
-}
-.exp-buttons button{
-  border:1.5px solid var(--border);
-  border-radius:14px;
-  padding:16px;
-  font-size:15px;
-  font-weight:600;
-  background:#fff;
-  cursor:pointer;
-  transition:.25s ease;
-}
-.exp-buttons button.selected,
-.exp-buttons button:hover{
-  border-color:var(--primary);
-  color:var(--primary);
-  background:rgba(229,9,20,0.08);
-}
-.form{
-  display:flex;
-  flex-direction:column;
-  gap:16px;
-}
-.form label{
-  font-weight:600;
-  font-size:14px;
-}
-.form input{
-  padding:14px 16px;
-  border:1.5px solid var(--border);
-  border-radius:12px;
-  font-size:15px;
-  transition:.25s ease;
-}
-.form input:focus{
-  outline:none;
-  border-color:var(--primary);
-  box-shadow:0 0 0 3px rgba(229,9,20,0.15);
-}
-.btn{
-  margin-top:8px;
-  padding:16px;
-  border:none;
-  border-radius:14px;
-  font-weight:700;
-  font-size:15px;
-  cursor:pointer;
-  transition:.25s ease;
-}
-.btn.primary{
-  background:var(--primary);
-  color:#fff;
-  box-shadow:0 12px 30px rgba(229,9,20,0.35);
-}
-.btn:disabled{
-  opacity:.5;
-  cursor:not-allowed;
-  box-shadow:none;
-}
-.final{
-  text-align:center;
-}
-.final .icon{
-  width:88px;
-  height:88px;
-  border-radius:50%;
-  background:rgba(229,9,20,0.1);
-  color:var(--primary);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-size:40px;
-  margin:0 auto 22px;
-}
-@media(max-width:520px){
-  body{padding:16px;}
-  .header,.step{padding:24px 20px;}
-  h1{font-size:22px;}
+:root{--primary:#ff6b35;--dark:#1f1f1f;--light:#fff;--gray:#f5f5f5;--accent:#1ec0ff;--radius:12px;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Inter",Arial,sans-serif;}
+body{background:#fff;color:#111;line-height:1.5;}
+header{background:radial-gradient(circle at top,#ffb347,#ff6b35);color:#fff;padding:80px 5%;text-align:center;position:relative;overflow:hidden;}
+header:after{content:"";position:absolute;top:-30%;right:-10%;width:400px;height:400px;background:rgba(255,255,255,.15);border-radius:50%;filter:blur(10px);}
+header h1{font-size:clamp(2rem,5vw,3.5rem);margin-bottom:16px;z-index:1;position:relative;}
+header p{max-width:550px;margin:0 auto 28px;z-index:1;position:relative;}
+.btn-primary{background:#fff;color:#ff6b35;border:none;padding:16px 32px;border-radius:var(--radius);font-weight:700;font-size:1rem;cursor:pointer;box-shadow:0 10px 25px rgba(0,0,0,.15);transition:.25s;}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 12px 30px rgba(0,0,0,.2);}
+.hero-form{background:#fff;color:#111;padding:20px;border-radius:var(--radius);max-width:420px;margin:32px auto 0;box-shadow:0 20px 45px rgba(0,0,0,.15);}
+.hero-form input,.hero-form button{width:100%;padding:14px;border-radius:var(--radius);border:1px solid #ddd;font-size:1rem;margin-bottom:14px;}
+.hero-form button{background:var(--primary);border:none;color:#fff;font-weight:700;}
+section{padding:70px 5%;}
+.section-title{text-align:center;margin-bottom:48px;}
+.section-title h2{font-size:clamp(1.8rem,4vw,2.8rem);margin-bottom:12px;}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:20px;}
+.step-card{background:var(--gray);padding:24px;border-radius:var(--radius);position:relative;}
+.step-card span{background:var(--primary);color:#fff;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;margin-bottom:14px;}
+.countdown{display:flex;justify-content:center;gap:16px;margin-top:18px;}
+.countdown div{background:rgba(255,255,255,.9);color:#ff6b35;padding:12px 18px;border-radius:var(--radius);text-align:center;min-width:75px;}
+.offer{background:var(--dark);color:#fff;border-radius:var(--radius);padding:50px;display:flex;gap:40px;flex-wrap:wrap;align-items:center;}
+.offer img{max-width:320px;width:100%;border-radius:var(--radius);}
+.offer-content{flex:1;min-width:240px;}
+.offer-content ul{list-style:none;margin:20px 0;}
+.offer-content li{margin-bottom:10px;padding-left:28px;position:relative;}
+.offer-content li:before{content:"✔";position:absolute;left:0;color:var(--accent);}
+.price-tag{font-size:2.5rem;font-weight:700;margin:18px 0;}
+.testimonials{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;}
+.testimonial{background:#fff;border:1px solid #eee;padding:24px;border-radius:var(--radius);box-shadow:0 10px 25px rgba(0,0,0,.06);}
+.testimonial h4{margin-top:12px;color:var(--primary);}
+.faq{max-width:900px;margin:0 auto;}
+details{background:#fff;border:1px solid #eee;border-radius:var(--radius);margin-bottom:14px;padding:18px;}
+details[open]{border-color:var(--primary);box-shadow:0 8px 20px rgba(0,0,0,.08);}
+details summary{cursor:pointer;font-weight:700;margin-bottom:10px;}
+.cta{background:var(--primary);color:#fff;text-align:center;border-radius:var(--radius);padding:50px;}
+.cta button{background:#fff;color:var(--primary);border:none;padding:16px 32px;border-radius:var(--radius);font-size:1.1rem;font-weight:700;margin-top:16px;cursor:pointer;}
+footer{padding:40px 5%;background:#111;color:#bbb;text-align:center;font-size:.9rem;}
+@media(max-width:768px){
+header{padding:60px 7%;}
+.offer{flex-direction:column;}
+.offer img{order:2;}
+.offer-content{order:1;}
 }
 </style>
 </head>
 <body>
-<section class="funnel">
-  <header class="header">
-    <div class="logo">ELEKTRO PRO</div>
-    <div class="progress"><div class="progress__bar" id="progressBar"></div></div>
-  </header>
+<header>
+<h1>Maximiere Deine Conversions mit unserem smarten Sales Funnel</h1>
+<p>Sichere dir jetzt den Zugang zu unserem bewährten System und verwandle Besucher in begeisterte Kund:innen – vollautomatisiert und messbar.</p>
+<button class="btn-primary" onclick="document.getElementById('lead-form').scrollIntoView({behavior:'smooth'});">Kostenlosen Funnel-Plan anfordern</button>
+<div class="countdown" id="countdown">
+<div><strong id="days">00</strong><br>Tage</div>
+<div><strong id="hours">00</strong><br>Std</div>
+<div><strong id="minutes">00</strong><br>Min</div>
+<div><strong id="seconds">00</strong><br>Sec</div>
+</div>
+<div class="hero-form" id="lead-form">
+<h3>Gratis Funnel-Analyse sichern</h3>
+<form>
+<input type="text" placeholder="Vollständiger Name" required>
+<input type="email" placeholder="Business E-Mail" required>
+<input type="tel" placeholder="Telefonnummer" required>
+<button type="submit">Analyse reservieren</button>
+<p style="font-size:.85rem;color:#666;">100% kostenlos · keine Verpflichtung · DSGVO-konform</p>
+</form>
+</div>
+</header>
 
-  <div class="step active" data-step="1">
-    <h1>Welche Ausbildung hast du?</h1>
-    <p class="subtitle">Wähle die Option, die am besten auf dich zutrifft.</p>
-    <div class="options" id="trainingOptions">
-      <label class="option">
-        <input type="radio" name="training" value="Elektroinstallateur">
-        Elektroinstallateur
-      </label>
-      <label class="option">
-        <input type="radio" name="training" value="Montage Elektriker">
-        Montage Elektriker
-      </label>
-      <label class="option">
-        <input type="radio" name="training" value="Ausbildung in der Elektrotechnik">
-        Ausbildung in der Elektrotechnik
-      </label>
-      <label class="option">
-        <input type="radio" name="training" value="Keine Ausbildung in diesem Bereich">
-        Keine Ausbildung in diesem Bereich
-      </label>
-    </div>
-    <button class="btn primary" id="toStep2" disabled>Weiter</button>
-  </div>
-
-  <div class="step" data-step="2">
-    <h1>Wie viel Berufserfahrung hast du?</h1>
-    <p class="subtitle">Ein Klick reicht aus.</p>
-    <div class="exp-buttons" id="experienceButtons">
-      <button data-exp="0-1">0–1 Jahr</button>
-      <button data-exp="1-3">1–3 Jahre</button>
-      <button data-exp="3-5">3–5 Jahre</button>
-      <button data-exp="5+">Über 5 Jahre</button>
-    </div>
-  </div>
-
-  <div class="step" data-step="3">
-    <h1>Wie erreichen wir dich?</h1>
-    <p class="subtitle">Bitte gib deine Kontaktdaten ein.</p>
-    <form class="form" id="contactForm">
-      <div>
-        <label for="name">Name</label>
-        <input id="name" name="name" type="text" placeholder="Dein Name" required>
-      </div>
-      <div>
-        <label for="email">E-Mail</label>
-        <input id="email" name="email" type="email" placeholder="name@mail.com" required>
-      </div>
-      <button class="btn primary" type="submit">Absenden</button>
-    </form>
-  </div>
-
-  <div class="step" data-step="4">
-    <div class="final">
-      <div class="icon">✓</div>
-      <h1>Danke für deine Angaben!</h1>
-      <p class="subtitle" id="finalMessage">Wir melden uns in Kürze mit weiteren Informationen.</p>
-    </div>
-  </div>
+<section>
+<div class="section-title">
+<h2>So führt unser Funnel deine Interessent:innen zum Kauf</h2>
+<p>In drei glasklaren Schritten vom ersten Klick bis zum Abschluss.</p>
+</div>
+<div class="steps">
+<div class="step-card">
+<span>1</span>
+<h3>Traffic gezielt anziehen</h3>
+<p>Mit datenbasierten Ads & Content locken wir hochqualifizierte Leads in deine Welt.</p>
+</div>
+<div class="step-card">
+<span>2</span>
+<h3>Nurturing automatisieren</h3>
+<p>Personalisierte E-Mail-Sequenzen bauen Vertrauen auf und steigern die Kaufbereitschaft.</p>
+</div>
+<div class="step-card">
+<span>3</span>
+<h3>Conversion maximieren</h3>
+<p>Optimierte Checkout-Strecken und Social Proof sorgen für mehr Abschlüsse.</p>
+</div>
+</div>
 </section>
 
+<section>
+<div class="offer">
+<img src="https://images.unsplash.com/photo-1498050108023-c5249f4df085?auto=format&fit=crop&w=900&q=80" alt="Dashboard">
+<div class="offer-content">
+<h2>Exklusives Funnel-Komplettpaket</h2>
+<ul>
+<li>Strategie-Workshop inkl. Zielgruppen-Analyse</li>
+<li>Funnel-Design & Copywriting auf Conversion optimiert</li>
+<li>Automations-Setup mit E-Mail & CRM-Anbindung</li>
+<li>Live-Tracking & Performance-Dashboards</li>
+</ul>
+<div class="price-tag">Nur 1.990 €</div>
+<p>inkl. persönlichem Kick-off & 30 Tagen Performance-Optimierung</p>
+<button class="btn-primary" onclick="document.getElementById('checkout').scrollIntoView({behavior:'smooth'});">Jetzt Platz sichern</button>
+</div>
+</div>
+</section>
+
+<section>
+<div class="section-title">
+<h2>Stimmen unserer Kund:innen</h2>
+<p>Was Unternehmen nach 30 Tagen Funnel-Boost berichten.</p>
+</div>
+<div class="testimonials">
+<div class="testimonial">
+<p>“Die Conversion Rate ist von 1,8% auf 4,7% gestiegen. Der Funnel läuft quasi im Autopilot.”</p>
+<h4>Laura K., SaaS-Startup</h4>
+</div>
+<div class="testimonial">
+<p>“Wir haben den kompletten Launch über euren Funnel abgewickelt und innerhalb von 10 Tagen 240k € Umsatz gemacht.”</p>
+<h4>Martin S., E-Learning</h4>
+</div>
+<div class="testimonial">
+<p>“Endlich klare Zahlen & ein Setup, das auch mobil perfekt performt. Absolute Empfehlung.”</p>
+<h4>Sara B., Agentur</h4>
+</div>
+</div>
+</section>
+
+<section class="faq">
+<div class="section-title">
+<h2>Häufige Fragen</h2>
+</div>
+<details>
+<summary>Für wen eignet sich das Funnel-Paket?</summary>
+<p>Für Coaches, Agenturen, SaaS und E-Commerce-Brands, die skalieren und ihre Lead-to-Sale-Quote steigern möchten.</p>
+</details>
+<details>
+<summary>Wie schnell ist der Funnel live?</summary>
+<p>Nach dem Kick-off benötigen wir ca. 14 Tage bis zum Launch inkl. Automationen.</p>
+</details>
+<details>
+<summary>Welche Tools setzt ihr ein?</summary>
+<p>Wir arbeiten tool-agnostisch und integrieren u.a. HubSpot, ActiveCampaign, Zapier oder dein bestehendes System.</p>
+</details>
+</section>
+
+<section class="cta" id="checkout">
+<h2>Bereit für konstante Conversions?</h2>
+<p>Sichere dir jetzt deinen Platz im Funnel-Programm – limitiert auf 10 neue Projekte pro Monat.</p>
+<button onclick="document.querySelector('.hero-form').scrollIntoView({behavior:'smooth'});">Kostenlosen Call buchen</button>
+</section>
+
+<footer>
+<p>© <span id="year"></span> Conversion Labs – Performance Funnels made in Germany · Impressum · Datenschutz</p>
+</footer>
+
 <script>
-const steps = document.querySelectorAll('.step');
-const progressBar = document.getElementById('progressBar');
-const toStep2Btn = document.getElementById('toStep2');
-const trainingOptions = document.querySelectorAll('#trainingOptions .option');
-const expButtons = document.querySelectorAll('#experienceButtons button');
-const finalMessage = document.getElementById('finalMessage');
-let formData = {training:null, experience:null, name:null, email:null};
-
-function updateProgress(stepIndex){
-  const total = steps.length;
-  const percent = Math.min((stepIndex)/(total-1)*100,100);
-  progressBar.style.width = `${percent}%`;
+const endDate=new Date();endDate.setDate(endDate.getDate()+5);
+function updateCountdown(){
+const now=new Date().getTime();
+const distance=endDate-now;
+if(distance<=0){document.getElementById("countdown").innerHTML="<div>Aktion beendet</div>";return;}
+const days=Math.floor(distance/(1000*60*60*24));
+const hours=Math.floor((distance%(1000*60*60*24))/(1000*60*60));
+const minutes=Math.floor((distance%(1000*60*60))/(1000*60));
+const seconds=Math.floor((distance%(1000*60))/1000);
+document.getElementById("days").textContent=String(days).padStart(2,"0");
+document.getElementById("hours").textContent=String(hours).padStart(2,"0");
+document.getElementById("minutes").textContent=String(minutes).padStart(2,"0");
+document.getElementById("seconds").textContent=String(seconds).padStart(2,"0");
 }
-
-function goToStep(number){
-  steps.forEach(step=>step.classList.remove('active'));
-  const target = document.querySelector(`.step[data-step="${number}"]`);
-  if(target){
-    target.classList.add('active');
-    updateProgress(number-1);
-  }
-}
-
-trainingOptions.forEach(option=>{
-  option.addEventListener('click',()=>{
-    trainingOptions.forEach(o=>o.classList.remove('active'));
-    option.classList.add('active');
-    const input = option.querySelector('input');
-    input.checked = true;
-    formData.training = input.value;
-    toStep2Btn.disabled = false;
-  });
-});
-
-toStep2Btn.addEventListener('click',()=>{
-  if(!formData.training) return;
-  if(formData.training === 'Keine Ausbildung in diesem Bereich'){
-    finalMessage.textContent = 'Danke für dein Interesse. Aktuell suchen wir Personen mit einer elektrotechnischen Ausbildung.';
-    goToStep(4);
-  }else{
-    finalMessage.textContent = 'Wir melden uns in Kürze mit weiteren Informationen.';
-    goToStep(2);
-  }
-});
-
-expButtons.forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    expButtons.forEach(b=>b.classList.remove('selected'));
-    btn.classList.add('selected');
-    formData.experience = btn.dataset.exp;
-    goToStep(3);
-  });
-});
-
-document.getElementById('contactForm').addEventListener('submit',e=>{
-  e.preventDefault();
-  formData.name = e.target.name.value.trim();
-  formData.email = e.target.email.value.trim();
-  goToStep(4);
+setInterval(updateCountdown,1000);
+updateCountdown();
+document.getElementById("year").textContent=new Date().getFullYear();
+document.querySelector('.hero-form form').addEventListener('submit',e=>{
+e.preventDefault();
+alert("Danke! Wir melden uns innerhalb von 24 Stunden.");
+e.target.reset();
 });
 </script>
 </body>
