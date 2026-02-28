@@ -8,31 +8,30 @@
   <style>
     :root{
       --primary:#e10600;
-      --primary-dark:#b50400;
+      --primary-dark:#b80500;
       --bg:#ffffff;
-      --text:#1e1e1e;
+      --text:#111111;
       --muted:#6b7280;
       --card:#ffffff;
       --border:#ececec;
+      --success:#0f9d58;
+      --error:#c62828;
       --shadow:0 10px 30px rgba(0,0,0,.08);
-      --radius:16px;
+      --radius:18px;
     }
 
-    *{box-sizing:border-box;}
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
     body{
-      margin:0;
-      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-      background:linear-gradient(180deg,#fff 0%,#fff 60%,#fff5f5 100%);
-      color:var(--text);
-      min-height:100vh;
+      min-height:100svh;
       display:flex;
       align-items:center;
       justify-content:center;
       padding:20px;
     }
 
-    .funnel{
-      width:min(720px,100%);
+    .app{
+      width:min(740px,100%);
       background:var(--card);
       border:1px solid var(--border);
       border-radius:var(--radius);
@@ -42,322 +41,290 @@
 
     .topbar{
       height:8px;
-      background:var(--primary);
+      background:linear-gradient(90deg,var(--primary),#ff4b45);
+    }
+
+    .content{padding:24px}
+    @media (max-width:640px){.content{padding:18px}}
+
+    .progress-wrap{
+      margin-bottom:14px;
+    }
+    .progress{
+      width:100%;
+      height:8px;
+      border-radius:999px;
+      background:#f1f1f1;
+      overflow:hidden;
+    }
+    .progress > span{
+      display:block;
+      height:100%;
       width:0%;
-      transition:width .35s ease;
+      background:var(--primary);
+      transition:width .3s ease;
     }
-
-    .content{
-      padding:28px 22px;
-    }
-
-    h1{
-      margin:0 0 6px;
-      font-size:1.55rem;
-      line-height:1.2;
-    }
-
-    p.lead{
-      margin:0 0 24px;
+    .progress-text{
+      margin-top:8px;
+      font-size:.9rem;
       color:var(--muted);
-      font-size:.98rem;
     }
 
-    .step{display:none; animation:fade .25s ease;}
-    .step.active{display:block;}
-
+    .step{display:none; animation:fade .25s ease}
+    .step.active{display:block}
     @keyframes fade{
-      from{opacity:0; transform:translateY(6px);}
-      to{opacity:1; transform:translateY(0);}
+      from{opacity:0; transform:translateY(6px)}
+      to{opacity:1; transform:translateY(0)}
     }
 
-    .question{
-      font-size:1.2rem;
-      margin:0 0 14px;
-      font-weight:700;
+    h1,h2{margin:0 0 10px}
+    h1{font-size:1.55rem}
+    h2{font-size:1.35rem}
+    .subtitle{
+      margin:0 0 18px;
+      color:var(--muted);
+      line-height:1.45;
     }
 
     .options{
       display:grid;
+      grid-template-columns:1fr 1fr;
       gap:12px;
-      grid-template-columns:1fr;
-      margin-bottom:14px;
+    }
+    @media (max-width:640px){
+      .options{grid-template-columns:1fr}
     }
 
-    button.option{
-      border:1px solid #f1c7c7;
+    .option-btn{
+      border:1px solid var(--border);
       background:#fff;
       color:var(--text);
+      padding:14px 12px;
       border-radius:12px;
-      padding:14px 14px;
       font-size:1rem;
       font-weight:600;
-      text-align:left;
       cursor:pointer;
+      text-align:left;
       transition:.2s ease;
+      min-height:56px;
     }
-
-    button.option:hover{
+    .option-btn:hover{
       border-color:var(--primary);
+      box-shadow:0 6px 18px rgba(225,6,0,.15);
       transform:translateY(-1px);
-      box-shadow:0 8px 20px rgba(225,6,0,.12);
     }
 
-    .hint{
-      font-size:.92rem;
-      color:var(--muted);
+    .form-grid{
+      display:grid;
+      gap:12px;
       margin-top:6px;
     }
-
-    .notice{
-      margin-top:12px;
-      padding:12px 14px;
-      border-radius:10px;
-      background:#fff0f0;
-      color:var(--primary-dark);
-      border:1px solid #ffd6d6;
-      font-size:.94rem;
-    }
-
-    .field{
-      margin-bottom:14px;
-    }
-
-    label{
-      display:block;
-      font-size:.92rem;
-      margin-bottom:8px;
-      font-weight:600;
-    }
-
-    input{
+    .input{
       width:100%;
-      border:1px solid #e8e8e8;
+      border:1px solid var(--border);
       border-radius:12px;
-      padding:13px 12px;
+      padding:13px 14px;
       font-size:1rem;
       outline:none;
-      transition:.2s ease;
+      transition:border-color .2s ease, box-shadow .2s ease;
     }
-
-    input:focus{
+    .input:focus{
       border-color:var(--primary);
       box-shadow:0 0 0 4px rgba(225,6,0,.12);
-    }
-
-    .actions{
-      display:flex;
-      gap:10px;
-      margin-top:12px;
-      flex-wrap:wrap;
     }
 
     .btn{
       border:none;
       border-radius:12px;
-      padding:12px 16px;
-      cursor:pointer;
+      padding:13px 16px;
+      font-size:1rem;
       font-weight:700;
-      font-size:.96rem;
+      cursor:pointer;
+      transition:.2s ease;
     }
-
     .btn-primary{
       background:var(--primary);
       color:#fff;
     }
-    .btn-primary:hover{background:var(--primary-dark);}
+    .btn-primary:hover{background:var(--primary-dark)}
 
-    .btn-ghost{
-      background:#fff;
-      border:1px solid #e8e8e8;
-      color:#333;
+    .center{text-align:center}
+    .tag{
+      display:inline-block;
+      font-size:.85rem;
+      color:var(--primary);
+      background:rgba(225,6,0,.08);
+      border:1px solid rgba(225,6,0,.2);
+      border-radius:999px;
+      padding:6px 10px;
+      margin-bottom:10px;
+      font-weight:700;
     }
 
-    .status{
+    #statusLabel{
       margin-top:10px;
-      font-size:.92rem;
+      font-size:.95rem;
       min-height:20px;
     }
 
-    .thankyou{
-      text-align:center;
-      padding:18px 6px 4px;
-    }
-    .check{
-      width:62px;height:62px;border-radius:50%;
-      background:#ffe7e7;color:var(--primary);
-      display:grid;place-items:center;
-      font-size:1.7rem;font-weight:900;
-      margin:0 auto 10px;
-    }
-
-    @media (min-width:640px){
-      .content{padding:34px;}
-      .options.grid-2{grid-template-columns:1fr 1fr;}
+    .small{
+      color:var(--muted);
+      font-size:.87rem;
+      margin-top:8px;
     }
   </style>
 </head>
 <body>
-  <main class="funnel">
-    <div id="progress" class="topbar"></div>
-    <section class="content">
-      <h1>Kurzer Karriere-Check</h1>
-      <p class="lead">Beantworte 3 kurze Fragen. Dauer: unter 1 Minute.</p>
+  <main class="app">
+    <div class="topbar"></div>
+    <div class="content">
+      <div class="progress-wrap">
+        <div class="progress"><span id="progressBar"></span></div>
+        <div class="progress-text" id="progressText">Schritt 1 von 3</div>
+      </div>
 
-      <!-- Schritt 1 -->
-      <div id="step1" class="step active">
-        <h2 class="question">1) Welche Ausbildung hast du?</h2>
+      <!-- Step 1 -->
+      <section class="step active" id="step1">
+        <span class="tag">Frage 1</span>
+        <h1>Welche Ausbildung hast du?</h1>
+        <p class="subtitle">Bitte wähle die passende Option aus.</p>
         <div class="options">
-          <button class="option" data-training="Elektroinstallateur">Elektroinstallateur</button>
-          <button class="option" data-training="Montage Elektriker">Montage Elektriker</button>
-          <button class="option" data-training="Ausbildung in der Elektrotechnik">Ausbildung in der Elektrotechnik</button>
-          <button class="option" data-training="Keine Ausbildung in diesem Bereich">Keine Ausbildung in diesem Bereich</button>
+          <button class="option-btn" data-training="Elektroinstallateur">Elektroinstallateur</button>
+          <button class="option-btn" data-training="Montage Elektriker">Montage Elektriker</button>
+          <button class="option-btn" data-training="Ausbildung in der Elektrotechnik">Ausbildung in der Elektrotechnik</button>
+          <button class="option-btn" data-training="keine Ausbildung in diesem Bereich">Keine Ausbildung in diesem Bereich</button>
         </div>
-        <p class="hint">Wähle eine Option, um fortzufahren.</p>
-        <div id="noTrainingNotice" class="notice" style="display:none;">
-          Danke für deine Antwort. Für diese Position ist eine Ausbildung im Bereich Elektrotechnik erforderlich.
+      </section>
+
+      <!-- Step 2 -->
+      <section class="step" id="step2">
+        <span class="tag">Frage 2</span>
+        <h2>Wie viel Berufserfahrung hast du?</h2>
+        <p class="subtitle">Wähle deine Erfahrung aus.</p>
+        <div class="options">
+          <button class="option-btn" data-experience="0-1 Jahr">0 bis 1 Jahr</button>
+          <button class="option-btn" data-experience="1-3 Jahre">1-3 Jahre</button>
+          <button class="option-btn" data-experience="3-5 Jahre">3-5 Jahre</button>
+          <button class="option-btn" data-experience="über 5 Jahre">Über fünf Jahre</button>
         </div>
-      </div>
+      </section>
 
-      <!-- Schritt 2 -->
-      <div id="step2" class="step">
-        <h2 class="question">2) Wie viel Berufserfahrung hast du?</h2>
-        <div class="options grid-2">
-          <button class="option" data-experience="0-1 Jahre">0–1 Jahr</button>
-          <button class="option" data-experience="1-3 Jahre">1–3 Jahre</button>
-          <button class="option" data-experience="3-5 Jahre">3–5 Jahre</button>
-          <button class="option" data-experience="Über 5 Jahre">Über 5 Jahre</button>
-        </div>
-      </div>
+      <!-- Step 3 -->
+      <section class="step" id="step3">
+        <span class="tag">Frage 3</span>
+        <h2>Fast geschafft</h2>
+        <p class="subtitle">Bitte gib noch deinen Namen und deine E-Mail ein.</p>
 
-      <!-- Schritt 3 -->
-      <div id="step3" class="step">
-        <h2 class="question">3) Fast geschafft – deine Kontaktdaten</h2>
-        <form id="inboxForm" onsubmit="saveToInbox(event)">
-          <div class="field">
-            <label for="userName">Name</label>
-            <input id="userName" name="name" type="text" placeholder="Max Mustermann" required />
-          </div>
-          <div class="field">
-            <label for="userEmail">E-Mail</label>
-            <input id="userEmail" name="email" type="email" placeholder="max@beispiel.ch" required />
-          </div>
-
-          <input type="hidden" id="userTraining" name="training" />
-          <input type="hidden" id="userExperience" name="experience" />
-
-          <div class="actions">
-            <button type="button" class="btn btn-ghost" id="backTo2">Zurück</button>
-            <button type="submit" class="btn btn-primary">Absenden</button>
-          </div>
-          <div id="statusLabel" class="status"></div>
+        <form id="inboxForm" class="form-grid">
+          <input class="input" type="text" id="userName" placeholder="Dein Name" required />
+          <input class="input" type="email" id="userEmail" placeholder="Deine E-Mail" required />
+          <input type="hidden" id="userExperience" />
+          <button class="btn btn-primary" type="submit">Absenden</button>
         </form>
-      </div>
+        <div id="statusLabel"></div>
+      </section>
 
-      <!-- Danke -->
-      <div id="step4" class="step">
-        <div class="thankyou">
-          <div class="check">✓</div>
-          <h2>Vielen Dank!</h2>
-          <p>Danke, dass du das Funnel ausgefüllt hast. Wir melden uns zeitnah bei dir.</p>
-        </div>
-      </div>
-    </section>
+      <!-- Thank You -->
+      <section class="step center" id="thanks">
+        <span class="tag">Vielen Dank</span>
+        <h2>Danke, dass du das Funnel ausgefüllt hast! 🎉</h2>
+        <p class="subtitle">Wir haben deine Angaben erhalten und melden uns zeitnah bei dir.</p>
+      </section>
+    </div>
   </main>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const steps = {
+    const stepEls = {
       step1: document.getElementById('step1'),
       step2: document.getElementById('step2'),
       step3: document.getElementById('step3'),
-      step4: document.getElementById('step4')
+      thanks: document.getElementById('thanks')
     };
-    const progress = document.getElementById('progress');
-    const noTrainingNotice = document.getElementById('noTrainingNotice');
-    const backTo2 = document.getElementById('backTo2');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
 
-    let funnelData = {
+    const state = {
       training: '',
       experience: ''
     };
 
-    function showStep(stepKey){
-      Object.values(steps).forEach(s => s.classList.remove('active'));
-      steps[stepKey].classList.add('active');
+    function showStep(step){
+      Object.values(stepEls).forEach(el => el.classList.remove('active'));
+      stepEls[step].classList.add('active');
 
-      const map = { step1: 25, step2: 55, step3: 85, step4: 100 };
-      progress.style.width = map[stepKey] + '%';
+      if(step === 'step1'){ progressBar.style.width = '33%'; progressText.textContent = 'Schritt 1 von 3'; }
+      if(step === 'step2'){ progressBar.style.width = '66%'; progressText.textContent = 'Schritt 2 von 3'; }
+      if(step === 'step3'){ progressBar.style.width = '100%'; progressText.textContent = 'Schritt 3 von 3'; }
+      if(step === 'thanks'){ progressBar.style.width = '100%'; progressText.textContent = 'Abgeschlossen'; }
     }
 
     document.querySelectorAll('[data-training]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const val = btn.dataset.training;
-        funnelData.training = val;
-        document.getElementById('userTraining').value = val;
-
-        if(val === 'Keine Ausbildung in diesem Bereich'){
-          noTrainingNotice.style.display = 'block';
-          progress.style.width = '25%';
-          return;
+        state.training = btn.dataset.training;
+        if(state.training.toLowerCase() === 'keine ausbildung in diesem bereich'){
+          showStep('thanks');
+        } else {
+          showStep('step2');
         }
-        noTrainingNotice.style.display = 'none';
-        showStep('step2');
       });
     });
 
     document.querySelectorAll('[data-experience]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const val = btn.dataset.experience;
-        funnelData.experience = val;
-        document.getElementById('userExperience').value = val;
+        state.experience = btn.dataset.experience;
+        document.getElementById('userExperience').value = `${state.training} | ${state.experience}`;
         showStep('step3');
       });
     });
-
-    backTo2.addEventListener('click', () => showStep('step2'));
   </script>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const _supabaseUrl = 'https://ajryeyxjftuxluneozgr.supabase.co';
-    const _supabaseKey = 'sb_publishable_LE6sSxq1pZu02vbsI_kVeQ_ERnicmI7';
-    const _supabase = supabase.createClient(_supabaseUrl, _supabaseKey);
+        // 2. Deine Supabase Zugangsdaten
+        const _supabaseUrl = 'https://ajryeyxjftuxluneozgr.supabase.co';
+        const _supabaseKey = 'sb_publishable_LE6sSxq1pZu02vbsI_kVeQ_ERnicmI7';
+        const _supabase = supabase.createClient(_supabaseUrl, _supabaseKey);
 
-    async function saveToInbox(event) {
-      event.preventDefault();
+        const form = document.getElementById('inboxForm');
+        const statusLabel = document.getElementById('statusLabel');
 
-      const nameInput = document.getElementById('userName').value.trim();
-      const emailInput = document.getElementById('userEmail').value.trim();
-      const trainingInput = document.getElementById('userTraining').value;
-      const experienceInput = document.getElementById('userExperience').value;
-      const statusLabel = document.getElementById('statusLabel');
+        // 3. Event Listener für das Absenden
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            
+            const nameValue = document.getElementById('userName').value;
+            const emailValue = document.getElementById('userEmail').value;
+            const experienceValue = document.getElementById('userExperience').value;
 
-      statusLabel.innerText = "Wird gesendet...";
-      statusLabel.style.color = "#6b7280";
+            statusLabel.innerText = "Wird gesendet...";
+            statusLabel.style.color = "black";
 
-      const { error } = await _supabase
-        .from('inbox')
-        .insert([
-          {
-            name: nameInput,
-            email: emailInput,
-            training: trainingInput,
-            experience: experienceInput
-          }
-        ]);
+            try {
+                // 4. Daten in die Tabelle 'inbox' einfügen
+                const { data, error } = await _supabase
+                    .from('inbox')
+                    .insert([
+                        { 
+                            name: nameValue, 
+                            email: emailValue, 
+                            experience: experienceValue 
+                        }
+                    ]);
 
-      if (error) {
-        console.error("Fehler:", error);
-        statusLabel.innerText = "Fehler: " + error.message;
-        statusLabel.style.color = "red";
-      } else {
-        statusLabel.innerText = "Erfolgreich gespeichert! 🎉";
-        statusLabel.style.color = "green";
-        document.getElementById('inboxForm').reset();
-        showStep('step4');
-      }
-    }
-  </script>
+                if (error) throw error;
+
+                statusLabel.innerText = "Erfolgreich in der Datenbank gespeichert! 🎉";
+                statusLabel.style.color = "green";
+                form.reset();
+                showStep('thanks');
+
+            } catch (err) {
+                console.error("Fehler beim Speichern:", err);
+                statusLabel.innerText = "Fehler: " + err.message;
+                statusLabel.style.color = "red";
+            }
+        });
+    </script>
 </body>
 </html>
 ```
