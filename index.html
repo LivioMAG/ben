@@ -145,6 +145,12 @@ input:focus{
     color:var(--muted);
     text-align:center;
 }
+#status{
+    margin-top:12px;
+    font-size:.95rem;
+    color:var(--muted);
+    text-align:center;
+}
 @media (max-width:520px){
     .funnel-wrapper{padding:28px 22px;}
     h2{font-size:1.2rem;}
@@ -193,6 +199,7 @@ input:focus{
                 <input id="email" type="email" placeholder="max@beispiel.ch" required>
             </div>
             <button type="submit" class="btn-primary">Absenden</button>
+            <div id="status"></div>
         </form>
     </section>
 
@@ -211,6 +218,7 @@ input:focus{
     </section>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const steps=Array.from(document.querySelectorAll('.step'));
 const progressBar=document.getElementById('progressBar');
@@ -260,9 +268,32 @@ document.getElementById('experienceOptions').addEventListener('click',e=>{
     btnStep3.disabled=false;
 });
 btnStep3.addEventListener('click',()=>showStep(3));
-document.getElementById('contactForm').addEventListener('submit',e=>{
+
+const supabaseUrl = 'https://DEINE_PROJEKT_ID.supabase.co';
+const supabaseKey = 'sb_publishable_LE6sSxq1pZu02vbsI_kVeQ_ERnicmI7';
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+const form = document.getElementById('contactForm');
+const statusMsg = document.getElementById('status');
+
+form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    showStep(4);
+    statusMsg.innerText = "Wird gesendet...";
+
+    const name = document.getElementById('name').value;
+    const email = document.getElementById('email').value;
+
+    const { error } = await supabase
+      .from('inbox')
+      .insert([{ name: name, email: email }]);
+
+    if (error) {
+        statusMsg.innerText = "Fehler: " + error.message;
+    } else {
+        statusMsg.innerText = "Erfolgreich gespeichert!";
+        form.reset();
+        showStep(4);
+    }
 });
 </script>
 </body>
