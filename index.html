@@ -1,1 +1,213 @@
-x
+```html
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Modernes 2-Step Funnel</title>
+<style>
+    :root {
+        --primary: #1f2233;
+        --secondary: #ff6b35;
+        --bg: #f4f6fb;
+        --text: #2b2e3c;
+        --radius: 18px;
+        --transition: 0.3s ease;
+    }
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    body {
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 20px;
+    }
+    .funnel {
+        background: #fff;
+        width: min(450px, 100%);
+        padding: 40px 32px;
+        border-radius: var(--radius);
+        box-shadow: 0 20px 60px rgba(31,34,51,0.15);
+        position: relative;
+        overflow: hidden;
+    }
+    .progress-track {
+        width: 100%;
+        height: 4px;
+        background: rgba(31,34,51,0.1);
+        border-radius: 999px;
+        margin-bottom: 30px;
+        overflow: hidden;
+    }
+    .progress-bar {
+        height: 100%;
+        width: 50%;
+        background: var(--secondary);
+        transition: width var(--transition);
+    }
+    h1 {
+        font-size: clamp(1.5rem, 4vw, 1.9rem);
+        margin-bottom: 24px;
+    }
+    p {
+        color: rgba(43,46,60,0.8);
+        margin-bottom: 16px;
+        line-height: 1.5;
+    }
+    .step {
+        display: none;
+        animation: fade var(--transition);
+    }
+    .step.active {
+        display: block;
+    }
+    label {
+        font-size: 0.95rem;
+        font-weight: 600;
+        display: block;
+        margin-bottom: 8px;
+    }
+    input, select {
+        width: 100%;
+        padding: 14px 16px;
+        border: 1px solid rgba(31,34,51,0.15);
+        border-radius: var(--radius);
+        font-size: 1rem;
+        transition: border var(--transition), box-shadow var(--transition);
+        background: #fdfdfd;
+    }
+    input:focus, select:focus {
+        border-color: var(--secondary);
+        box-shadow: 0 0 0 3px rgba(255,107,53,0.15);
+        outline: none;
+    }
+    .btn-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+    }
+    button {
+        flex: 1;
+        padding: 14px;
+        border: none;
+        border-radius: var(--radius);
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform var(--transition), box-shadow var(--transition);
+    }
+    .btn-primary {
+        background: var(--secondary);
+        color: #fff;
+        box-shadow: 0 12px 24px rgba(255,107,53,0.25);
+    }
+    .btn-secondary {
+        background: rgba(31,34,51,0.08);
+        color: var(--primary);
+    }
+    button:hover {
+        transform: translateY(-1px);
+    }
+    .hidden {
+        visibility: hidden;
+    }
+    @keyframes fade {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 520px) {
+        .funnel { padding: 28px 24px; }
+        .btn-group { flex-direction: column; }
+    }
+</style>
+</head>
+<body>
+<div class="funnel">
+    <div class="progress-track">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <form id="funnelForm">
+        <div class="step active" data-step="1">
+            <h1>Welche Ausbildung hast du gemacht?</h1>
+            <p>Teile uns deine Ausbildung mit, damit wir das beste Angebot für dich zusammenstellen können.</p>
+            <label for="ausbildung">Deine Ausbildung</label>
+            <select id="ausbildung" name="ausbildung" required>
+                <option value="" disabled selected>Bitte wählen...</option>
+                <option value="Lehre">Lehre / Ausbildung</option>
+                <option value="Studium">Studium (Bachelor/Master)</option>
+                <option value="Weiterbildung">Weiterbildung / Zertifikate</option>
+                <option value="Selbststudium">Selbststudium</option>
+                <option value="Sonstige">Sonstige</option>
+            </select>
+            <div class="btn-group">
+                <span></span>
+                <button type="button" class="btn-primary" id="nextBtn">Weiter</button>
+            </div>
+        </div>
+
+        <div class="step" data-step="2">
+            <h1>Perfekt! Lass uns in Kontakt bleiben.</h1>
+            <p>Trage deinen Namen und deine E-Mail ein, damit wir dir weitere Infos zusenden können.</p>
+            <label for="name">Dein Name</label>
+            <input type="text" id="name" name="name" placeholder="Max Mustermann" required />
+            <label for="email" style="margin-top:16px;">Deine E-Mail</label>
+            <input type="email" id="email" name="email" placeholder="name@email.de" required />
+            <div class="btn-group">
+                <button type="button" class="btn-secondary" id="prevBtn">Zurück</button>
+                <button type="submit" class="btn-primary">Jetzt absenden</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    const steps = document.querySelectorAll(".step");
+    const nextBtn = document.getElementById("nextBtn");
+    const prevBtn = document.getElementById("prevBtn");
+    const progressBar = document.getElementById("progressBar");
+    const form = document.getElementById("funnelForm");
+
+    let currentStep = 0;
+
+    function updateSteps() {
+        steps.forEach((step, index) => {
+            step.classList.toggle("active", index === currentStep);
+        });
+        progressBar.style.width = `${((currentStep + 1) / steps.length) * 100}%`;
+    }
+
+    nextBtn.addEventListener("click", () => {
+        const ausbildung = document.getElementById("ausbildung");
+        if (!ausbildung.value) {
+            ausbildung.reportValidity();
+            return;
+        }
+        currentStep = Math.min(currentStep + 1, steps.length - 1);
+        updateSteps();
+    });
+
+    prevBtn.addEventListener("click", () => {
+        currentStep = Math.max(currentStep - 1, 0);
+        updateSteps();
+    });
+
+    form.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const formData = new FormData(form);
+        console.log(Object.fromEntries(formData.entries()));
+        alert("Vielen Dank! Wir melden uns bei dir.");
+        form.reset();
+        currentStep = 0;
+        updateSteps();
+    });
+</script>
+</body>
+</html>
+```
