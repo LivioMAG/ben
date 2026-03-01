@@ -8,32 +8,35 @@
   <style>
     :root{
       --primary:#e10600;
+      --primary-dark:#b00400;
       --bg:#ffffff;
       --text:#1a1a1a;
-      --muted:#666;
-      --border:#e9e9e9;
-      --success:#0a8f3e;
+      --muted:#6b7280;
+      --border:#e5e7eb;
+      --success:#16a34a;
+      --radius:16px;
       --shadow:0 10px 30px rgba(0,0,0,.08);
-      --radius:18px;
     }
 
-    * { box-sizing: border-box; }
-
+    *{box-sizing:border-box}
     body{
       margin:0;
-      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
+      font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+      min-height:100dvh;
       display:flex;
       align-items:center;
       justify-content:center;
-      padding:16px;
+      padding:20px;
     }
 
-    .app{
+    .wrap{
       width:100%;
-      max-width:680px;
+      max-width:720px;
+    }
+
+    .card{
       background:#fff;
       border:1px solid var(--border);
       border-radius:var(--radius);
@@ -41,29 +44,29 @@
       overflow:hidden;
     }
 
-    .topbar{
-      height:8px;
-      background: linear-gradient(90deg, var(--primary), #ff4b47);
+    .header{
+      padding:22px 22px 14px;
+      border-bottom:1px solid var(--border);
     }
 
-    .content{
-      padding:26px;
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:700;
+      font-size:1.05rem;
+      color:var(--primary);
     }
 
-    .progress-wrap{
-      margin-bottom:18px;
-    }
-
-    .progress-label{
-      font-size:13px;
-      color:var(--muted);
-      margin-bottom:8px;
+    .dot{
+      width:10px;height:10px;border-radius:999px;background:var(--primary);
     }
 
     .progress{
+      margin-top:14px;
       width:100%;
-      height:10px;
-      background:#f3f3f3;
+      height:8px;
+      background:#f3f4f6;
       border-radius:999px;
       overflow:hidden;
     }
@@ -72,328 +75,273 @@
       display:block;
       height:100%;
       width:0%;
-      background:var(--primary);
-      transition: width .35s ease;
+      background:linear-gradient(90deg,var(--primary),#ff5a5a);
+      transition:width .28s ease;
+    }
+
+    .step{
+      display:none;
+      padding:24px 22px 26px;
+      animation:fade .25s ease;
+    }
+    .step.active{display:block}
+
+    @keyframes fade{
+      from{opacity:0;transform:translateY(6px)}
+      to{opacity:1;transform:translateY(0)}
     }
 
     h1{
-      margin:8px 0 6px;
-      font-size: clamp(1.35rem, 2.3vw, 1.8rem);
+      margin:0 0 8px;
+      font-size:1.4rem;
       line-height:1.25;
     }
-
-    p{
+    p.desc{
       margin:0 0 18px;
       color:var(--muted);
       font-size:.98rem;
     }
 
-    .step{
-      display:none;
-      animation: fade .25s ease;
-    }
-
-    .step.active{
-      display:block;
-    }
-
-    @keyframes fade{
-      from{opacity:0; transform:translateY(4px);}
-      to{opacity:1; transform:translateY(0);}
-    }
-
-    .grid{
+    .options{
       display:grid;
-      gap:12px;
+      grid-template-columns:1fr;
+      gap:10px;
     }
 
     .btn-option{
-      width:100%;
       border:1px solid var(--border);
       background:#fff;
-      border-radius:14px;
-      padding:14px 16px;
+      color:#111827;
+      border-radius:12px;
+      padding:14px 14px;
       text-align:left;
+      font-size:.98rem;
+      font-weight:600;
       cursor:pointer;
-      font-size:1rem;
-      color:var(--text);
       transition:.2s ease;
     }
-
     .btn-option:hover{
       border-color:var(--primary);
       transform:translateY(-1px);
     }
-
     .btn-option.selected{
       border-color:var(--primary);
       background:rgba(225,6,0,.06);
-      box-shadow: inset 0 0 0 1px var(--primary);
+      color:var(--primary-dark);
     }
 
-    .row{
+    .inline-note{
+      margin-top:12px;
+      color:var(--muted);
+      font-size:.92rem;
+    }
+
+    form{
       display:grid;
       gap:12px;
-      grid-template-columns:1fr;
+      margin-top:6px;
     }
 
     label{
-      font-size:.92rem;
+      font-size:.9rem;
+      color:#374151;
       font-weight:600;
-      margin-bottom:6px;
-      display:block;
     }
 
     input{
       width:100%;
       border:1px solid var(--border);
       border-radius:12px;
-      padding:12px 14px;
+      padding:13px 12px;
       font-size:1rem;
       outline:none;
-      transition:border-color .2s ease, box-shadow .2s ease;
+      transition:border-color .2s, box-shadow .2s;
+      background:#fff;
     }
-
     input:focus{
       border-color:var(--primary);
-      box-shadow:0 0 0 3px rgba(225,6,0,.14);
+      box-shadow:0 0 0 3px rgba(225,6,0,.15);
     }
 
     .actions{
-      margin-top:18px;
       display:flex;
       gap:10px;
+      margin-top:10px;
       flex-wrap:wrap;
     }
 
-    .btn{
+    button{
       border:none;
       border-radius:12px;
       padding:12px 16px;
+      font-weight:700;
       cursor:pointer;
-      font-size:1rem;
-      font-weight:600;
+      transition:.2s ease;
+      font-size:.95rem;
     }
 
-    .btn-primary{
+    .primary{
       background:var(--primary);
       color:#fff;
     }
-
-    .btn-ghost{
-      background:#f7f7f7;
-      color:var(--text);
+    .primary:hover{background:var(--primary-dark)}
+    .ghost{
+      background:#f8fafc;
+      color:#111827;
       border:1px solid var(--border);
     }
 
-    .info{
-      margin-top:14px;
-      font-size:.92rem;
-      color:var(--muted);
+    .center{
+      text-align:center;
+      padding:34px 22px 38px;
     }
 
-    .block-note{
-      border:1px solid #ffd0cf;
-      background:#fff2f2;
-      color:#8f1b19;
-      border-radius:12px;
-      padding:14px;
-      line-height:1.4;
-      margin-top:8px;
+    .check{
+      width:64px;height:64px;border-radius:50%;
+      margin:0 auto 14px;
+      display:grid;place-items:center;
+      background:rgba(22,163,74,.12);
+      color:var(--success);
+      font-size:30px;
+      font-weight:900;
     }
 
     #statusLabel{
-      margin-top:12px;
-      font-weight:600;
-      min-height:22px;
+      margin-top:10px;
+      font-size:.92rem;
+      min-height:20px;
+      color:var(--muted);
     }
 
-    .thanks{
-      text-align:center;
-      padding:10px 0 4px;
-    }
-
-    .thanks .icon{
-      width:68px;
-      height:68px;
-      border-radius:50%;
-      margin:0 auto 14px;
-      display:grid;
-      place-items:center;
-      background:rgba(10,143,62,.12);
-      color:var(--success);
-      font-size:30px;
-      font-weight:700;
-    }
-
-    @media (max-width:520px){
-      .content{ padding:18px; }
-      .btn-option{ padding:13px; }
-      .btn{ width:100%; }
+    @media (min-width:640px){
+      h1{font-size:1.55rem}
+      .options.two-col{
+        grid-template-columns:1fr 1fr;
+      }
     }
   </style>
 </head>
 <body>
-  <main class="app" aria-live="polite">
-    <div class="topbar"></div>
-    <div class="content">
-      <div class="progress-wrap">
-        <div class="progress-label" id="progressText">Schritt 1 von 3</div>
+  <div class="wrap">
+    <div class="card">
+      <div class="header">
+        <div class="brand"><span class="dot"></span> Karriere Check</div>
         <div class="progress"><span id="progressBar"></span></div>
       </div>
 
-      <!-- Schritt 1 -->
+      <!-- Step 1 -->
       <section class="step active" id="step1">
-        <h1>Welche Ausbildung hast du?</h1>
-        <p>Wähle die passende Option aus.</p>
-        <div class="grid" id="trainingOptions">
+        <h1>1) Welche Ausbildung hast du?</h1>
+        <p class="desc">Bitte wähle eine Option aus.</p>
+        <div class="options">
           <button class="btn-option" data-value="Elektroinstallateur">Elektroinstallateur</button>
           <button class="btn-option" data-value="Montage Elektriker">Montage Elektriker</button>
           <button class="btn-option" data-value="Ausbildung in der Elektrotechnik">Ausbildung in der Elektrotechnik</button>
-          <button class="btn-option" data-value="keine Ausbildung in diesem Bereich">keine Ausbildung in diesem Bereich</button>
+          <button class="btn-option" data-value="Keine Ausbildung in diesem Bereich">Keine Ausbildung in diesem Bereich</button>
         </div>
-        <div class="actions">
-          <button class="btn btn-primary" id="toStep2" disabled>Weiter</button>
-        </div>
+        <p class="inline-note" id="step1Note"></p>
       </section>
 
-      <!-- Abbruch wenn keine Ausbildung -->
-      <section class="step" id="blockedStep">
-        <h1>Danke für dein Interesse</h1>
-        <div class="block-note">
-          Aktuell suchen wir Bewerber mit Ausbildung im Elektrobereich.
-          Wenn sich das ändert, melden wir uns gerne.
-        </div>
-        <div class="actions">
-          <button class="btn btn-ghost" id="restartFromBlocked">Neu starten</button>
-        </div>
-      </section>
-
-      <!-- Schritt 2 -->
+      <!-- Step 2 -->
       <section class="step" id="step2">
-        <h1>Wie viel Berufserfahrung hast du?</h1>
-        <p>Wähle eine der vier Optionen.</p>
-        <div class="grid" id="experienceOptions">
-          <button class="btn-option" data-value="0-1 Jahr">0 bis 1 Jahr</button>
+        <h1>2) Wie viel Berufserfahrung hast du?</h1>
+        <p class="desc">Wähle die passende Erfahrungsstufe.</p>
+        <div class="options two-col">
+          <button class="btn-option" data-value="0-1 Jahre">0 bis 1 Jahr</button>
           <button class="btn-option" data-value="1-3 Jahre">1-3 Jahre</button>
           <button class="btn-option" data-value="3-5 Jahre">3-5 Jahre</button>
-          <button class="btn-option" data-value="über 5 Jahre">über fünf Jahre</button>
+          <button class="btn-option" data-value="Über 5 Jahre">Über fünf Jahre</button>
         </div>
         <div class="actions">
-          <button class="btn btn-ghost" id="backTo1">Zurück</button>
-          <button class="btn btn-primary" id="toStep3" disabled>Weiter</button>
+          <button class="ghost" id="backTo1">Zurück</button>
         </div>
       </section>
 
-      <!-- Schritt 3 -->
+      <!-- Step 3 -->
       <section class="step" id="step3">
-        <h1>Fast geschafft</h1>
-        <p>Bitte gib deinen Namen und deine E-Mail ein.</p>
+        <h1>3) Fast geschafft – deine Kontaktdaten</h1>
+        <p class="desc">Bitte Name und E-Mail eingeben.</p>
+
         <form id="inboxForm">
-          <div class="row">
-            <div>
-              <label for="userName">Name</label>
-              <input type="text" id="userName" required placeholder="Max Mustermann" />
-            </div>
-            <div>
-              <label for="userEmail">E-Mail</label>
-              <input type="email" id="userEmail" required placeholder="max@beispiel.ch" />
-            </div>
+          <div>
+            <label for="userName">Name</label>
+            <input id="userName" type="text" placeholder="Max Muster" required />
           </div>
-          <input type="hidden" id="userExperience" />
+
+          <div>
+            <label for="userEmail">E-Mail</label>
+            <input id="userEmail" type="email" placeholder="max@muster.ch" required />
+          </div>
+
+          <input id="userExperience" type="hidden" />
           <div class="actions">
-            <button type="button" class="btn btn-ghost" id="backTo2">Zurück</button>
-            <button type="submit" class="btn btn-primary">Absenden</button>
+            <button type="button" class="ghost" id="backTo2">Zurück</button>
+            <button type="submit" class="primary">Absenden</button>
           </div>
           <div id="statusLabel"></div>
         </form>
       </section>
 
-      <!-- Danke -->
-      <section class="step" id="step4">
-        <div class="thanks">
-          <div class="icon">✓</div>
-          <h1>Vielen Dank!</h1>
-          <p>Danke, dass du das Funnel ausgefüllt hast. Wir melden uns bald bei dir.</p>
-        </div>
+      <!-- Step 4 -->
+      <section class="step center" id="step4">
+        <div class="check">✓</div>
+        <h1>Vielen Dank!</h1>
+        <p class="desc">Danke, dass du unser Funnel ausgefüllt hast. Wir melden uns bald bei dir.</p>
       </section>
     </div>
-  </main>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    const steps = ["step1","step2","step3","step4","blockedStep"];
-    const progressText = document.getElementById("progressText");
+    const steps = ["step1","step2","step3","step4"];
     const progressBar = document.getElementById("progressBar");
-
     const state = {
-      training: "",
-      experience: ""
+      ausbildung: "",
+      erfahrung: ""
     };
 
     function showStep(id){
       steps.forEach(s => document.getElementById(s).classList.remove("active"));
       document.getElementById(id).classList.add("active");
-
-      if(id === "step1"){ setProgress(1,3); }
-      if(id === "step2"){ setProgress(2,3); }
-      if(id === "step3"){ setProgress(3,3); }
-      if(id === "step4"){ setProgress(3,3,true); }
-      if(id === "blockedStep"){
-        progressText.textContent = "Nicht qualifiziert";
-        progressBar.style.width = "33%";
-      }
+      const map = {step1:25, step2:55, step3:85, step4:100};
+      progressBar.style.width = (map[id] || 0) + "%";
     }
 
-    function setProgress(step,total,done=false){
-      progressText.textContent = done ? "Abgeschlossen" : `Schritt ${step} von ${total}`;
-      progressBar.style.width = `${(step/total)*100}%`;
-    }
+    // Step 1 logic
+    const step1Buttons = document.querySelectorAll("#step1 .btn-option");
+    const step1Note = document.getElementById("step1Note");
 
-    function selectOption(containerId, value){
-      document.querySelectorAll(`#${containerId} .btn-option`).forEach(btn => {
-        btn.classList.toggle("selected", btn.dataset.value === value);
-      });
-    }
-
-    document.querySelectorAll("#trainingOptions .btn-option").forEach(btn => {
+    step1Buttons.forEach(btn => {
       btn.addEventListener("click", () => {
-        state.training = btn.dataset.value;
-        selectOption("trainingOptions", state.training);
-        document.getElementById("toStep2").disabled = false;
+        step1Buttons.forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+
+        state.ausbildung = btn.dataset.value;
+
+        if(state.ausbildung === "Keine Ausbildung in diesem Bereich"){
+          step1Note.textContent = "Danke für deine Antwort. Für diese Position ist eine Ausbildung im Elektrobereich erforderlich.";
+          step1Note.style.color = "#b91c1c";
+          setTimeout(() => showStep("step4"), 900);
+        } else {
+          step1Note.textContent = "";
+          showStep("step2");
+        }
       });
     });
 
-    document.querySelectorAll("#experienceOptions .btn-option").forEach(btn => {
+    // Step 2 logic
+    const step2Buttons = document.querySelectorAll("#step2 .btn-option");
+    step2Buttons.forEach(btn => {
       btn.addEventListener("click", () => {
-        state.experience = btn.dataset.value;
-        selectOption("experienceOptions", state.experience);
-        document.getElementById("toStep3").disabled = false;
+        step2Buttons.forEach(b => b.classList.remove("selected"));
+        btn.classList.add("selected");
+        state.erfahrung = btn.dataset.value;
+        document.getElementById("userExperience").value = `${state.ausbildung} | ${state.erfahrung}`;
+        setTimeout(() => showStep("step3"), 220);
       });
-    });
-
-    document.getElementById("toStep2").addEventListener("click", () => {
-      if(state.training === "keine Ausbildung in diesem Bereich"){
-        showStep("blockedStep");
-      } else {
-        showStep("step2");
-      }
-    });
-
-    document.getElementById("restartFromBlocked").addEventListener("click", () => {
-      state.training = "";
-      selectOption("trainingOptions", "");
-      document.getElementById("toStep2").disabled = true;
-      showStep("step1");
     });
 
     document.getElementById("backTo1").addEventListener("click", () => showStep("step1"));
-
-    document.getElementById("toStep3").addEventListener("click", () => {
-      document.getElementById("userExperience").value = `${state.training} | ${state.experience}`;
-      showStep("step3");
-    });
-
     document.getElementById("backTo2").addEventListener("click", () => showStep("step2"));
   </script>
 
@@ -434,7 +382,7 @@
                 statusLabel.innerText = "Erfolgreich in der Datenbank gespeichert! 🎉";
                 statusLabel.style.color = "green";
                 form.reset();
-                showStep("step4");
+                setTimeout(() => showStep("step4"), 700);
 
             } catch (err) {
                 console.error("Fehler beim Speichern:", err);
