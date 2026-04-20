@@ -174,6 +174,9 @@ function renderPreviewCard(note, columnKey) {
   ` : '';
   const metaUser = getCurrentUserName();
   const metaTime = formatTimestamp(note.updated_at || note.created_at);
+  const inlinePrimary = noteType === 'text'
+    ? `<textarea class="note-preview-text inline-note-text" data-field="content-inline" data-note-id="${escapeAttribute(note.id)}" rows="3" aria-label="Notiztext">${escapeHtml(note.content || '')}</textarea>`
+    : `<p class="note-preview-text">${escapeHtml(previewText)}</p>`;
 
   return `
     <article class="note-preview note-preview-${escapeAttribute(noteType)}" draggable="true" data-note-id="${escapeAttribute(note.id)}" data-column="${escapeAttribute(note.status)}">
@@ -190,7 +193,7 @@ function renderPreviewCard(note, columnKey) {
           <button type="button" class="icon-plain" data-action="delete-note" data-note-id="${escapeAttribute(note.id)}" aria-label="Weitere Aktionen">⋯</button>
         </div>
       </div>
-      <p class="note-preview-text">${escapeHtml(previewText)}</p>
+      ${inlinePrimary}
       ${todoMarkup}
       ${counterMarkup}
       ${docsMarkup}
@@ -248,10 +251,6 @@ function handleBoardClick(event) {
     deleteNote(noteId);
     return;
   }
-  const preview = event.target.closest('.note-preview');
-  if (preview && !action) {
-    openNotePanel(String(preview.dataset.noteId || '').trim(), 'details');
-  }
 }
 function openCreatePanel(columnKey) {
   if (!columnKey) return;
@@ -282,16 +281,30 @@ function closePanel() {
 
 function renderTodoPreview(note) {
   const items = normalizeTodoItems(note.todo_items);
-  if (!items.length) return '<p class="note-preview-meta">Noch keine To-dos</p>';
+  const list = items.length
+    ? `
+      <ul class="todo-list compact">
+        ${items.slice(0, 6).map((item, index) => `
+          <li class="todo-item ${item.done ? 'done' : ''}">
+            <input type="checkbox" data-action="toggle-todo" data-note-id="${escapeAttribute(note.id)}" data-index="${index}" ${item.done ? 'checked' : ''} />
+            <input
+              type="text"
+              class="todo-inline-text"
+              maxlength="180"
+              value="${escapeAttribute(item.text || 'Untitled')}"
+              data-field="todo-item-inline"
+              data-note-id="${escapeAttribute(note.id)}"
+              data-index="${index}"
+              aria-label="To-do Text"
+            />
+          </li>
+          ${item.done_at ? `<li class="todo-item-meta">${escapeHtml(item.done_by_name || 'Unbekannt')} · ${escapeHtml(formatTimestamp(item.done_at))}</li>` : ''}
+        `).join('')}
+      </ul>
+    `
+    : '<p class="note-preview-meta">Noch keine To-dos</p>';
   return `
-    <ul class="todo-list compact">
-      ${items.slice(0, 4).map((item, index) => `
-        <li class="todo-item ${item.done ? 'done' : ''}">
-          <input type="checkbox" data-action="toggle-todo" data-note-id="${escapeAttribute(note.id)}" data-index="${index}" ${item.done ? 'checked' : ''} />
-          <span>${escapeHtml(item.text || 'Untitled')}</span>
-        </li>
-      `).join('')}
-    </ul>
+    ${list}
     <input type="text" class="todo-inline-input" maxlength="180" data-field="todo-input" data-note-id="${escapeAttribute(note.id)}" placeholder="To-do hinzufügen und Enter drücken" />
   `;
 }
@@ -305,7 +318,7 @@ function renderCounterPreview(note) {
       <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, Math.round((value / target) * 100))}">
         <div class="preview-progress-fill" style="width:${percent}%;"></div>
       </div>
-      <button type="button" class="button-primary counter-plus" data-action="confirm-counter-plus" data-note-id="${escapeAttribute(note.id)}">+1 bestätigen</button>
+      <button type="button" class="button-primary counter-plus" data-action="confirm-counter-plus" data-note-id="${escapeAttribute(note.id)}">Bestätigen</button>
   `;
 }
 
@@ -331,27 +344,21 @@ function renderUnifiedPanel(note) {
   const noteId = escapeAttribute(note.id);
   const descriptionField = type === 'text' ? 'content' : type === 'todo' ? 'todo-description' : 'counter-description';
   const descriptionValue = type === 'text' ? (note.content || '') : type === 'todo' ? (note.todo_description || '') : (note.counter_description || '');
-  const contentSection = type === 'todo' ? renderTodoPanelContent(note) : type === 'counter' ? renderCounterPanelContent(note) : '<p class="note-preview-meta">Für Text-Notizen ist kein zusätzlicher Content erforderlich.</p>';
-  const activitySection = renderActivityPanelContent(note);
+  const contentSection = type === 'todo' ? renderTodoPanelContent(note) : type === 'counter' ? renderCounterPanelContent(note) : '';
   const documentsSection = renderDocumentsPanelContent(note);
 
   return `
-    <section class="panel-section section-description">
+    <section class="panel-section section-description flat">
+      <h3>Notiz</h3>
       <textarea data-field="${escapeAttribute(descriptionField)}" data-note-id="${noteId}" placeholder="Beschreibung">${escapeHtml(descriptionValue)}</textarea>
     </section>
-    <section class="panel-section section-content">
+    <section class="panel-section section-content flat ${type === 'text' ? 'hidden' : ''}">
       ${contentSection}
     </section>
-    <section class="panel-section section-activity">
-      ${activitySection}
-    </section>
-    <section class="panel-section section-documents">
+    <section class="panel-section section-documents flat">
       ${documentsSection}
     </section>
-    <section class="panel-actions">
-      <label class="button-secondary upload-button">Anhängen
-        <input type="file" data-action="upload-attachment" data-note-id="${noteId}" accept="${escapeAttribute(DOCUMENT_ACCEPT)}" />
-      </label>
+    <section class="panel-actions panel-actions-subtle">
       <button type="button" class="button-secondary" data-action="save-note" data-note-id="${noteId}">Speichern</button>
       <button type="button" class="button-danger" data-action="delete-note" data-note-id="${noteId}">Löschen</button>
     </section>
@@ -360,8 +367,15 @@ function renderUnifiedPanel(note) {
 
 function renderDocumentsPanelContent(note) {
   const attachments = normalizeAttachments(note.attachments);
+  const noteId = escapeAttribute(note.id);
   return `
-    <div class="documents-strip">
+    <div class="attachments-header-minimal">
+      <h3>Anhänge</h3>
+      <label class="icon-plain upload-button" aria-label="Anhang hochladen">➕
+        <input type="file" data-action="upload-attachment" data-note-id="${noteId}" accept="${escapeAttribute(DOCUMENT_ACCEPT)}" />
+      </label>
+    </div>
+    <div class="documents-strip compact">
       ${attachments.length ? attachments.map((attachment, index) => `
         <article class="doc-chip">
           <strong>${escapeHtml(getAttachmentVisual(attachment))} ${escapeHtml(attachment.name || 'Dokument')}</strong>
@@ -375,32 +389,31 @@ function renderDocumentsPanelContent(note) {
   `;
 }
 
-function renderActivityPanelContent(note) {
-  const rows = buildActivityTimeline(note).slice(0, 10);
-  return rows.length
-    ? `<ul class="activity-list compact activity-scroll">${rows.map((row) => `<li><strong>${escapeHtml(row.user)}</strong><span>${escapeHtml(row.when)}</span><p>${escapeHtml(row.action)}</p></li>`).join('')}</ul>`
-    : '<p class="note-preview-meta">Noch keine Aktivitäten.</p>';
-}
-
 function renderTodoPanelContent(note) {
   const items = normalizeTodoItems(note.todo_items);
   const todoRows = items.length
-    ? `<ul class="todo-list compact">${items.slice(0, 8).map((item, index) => `
+    ? `<ul class="todo-list compact">${items.slice(0, 12).map((item, index) => `
       <li class="todo-item ${item.done ? 'done' : ''}">
         <input type="checkbox" data-action="toggle-todo" data-note-id="${escapeAttribute(note.id)}" data-index="${index}" ${item.done ? 'checked' : ''} />
-        <span>${escapeHtml(item.text || 'Untitled')}</span>
+        <input
+          type="text"
+          class="todo-inline-text"
+          maxlength="180"
+          value="${escapeAttribute(item.text || 'Untitled')}"
+          data-field="todo-item-inline"
+          data-note-id="${escapeAttribute(note.id)}"
+          data-index="${index}"
+          aria-label="To-do Text"
+        />
       </li>
+      ${item.done_at ? `<li class="todo-item-meta">${escapeHtml(item.done_by_name || 'Unbekannt')} · ${escapeHtml(formatTimestamp(item.done_at))}</li>` : ''}
     `).join('')}</ul>`
     : '<p class="note-preview-meta">Noch keine To-dos</p>';
   return `
     <div class="todo-scroll">
+      <h3>To-dos</h3>
       ${todoRows}
-      <div class="todo-multi-add" data-note-id="${escapeAttribute(note.id)}" data-block="todo-multi">
-        <div class="todo-input-row">
-          <input type="text" maxlength="180" data-field="todo-batch-input" data-note-id="${escapeAttribute(note.id)}" placeholder="To-do eingeben" />
-          <button type="button" class="todo-add-line" data-action="add-todo-line" data-note-id="${escapeAttribute(note.id)}">+</button>
-        </div>
-      </div>
+      <input type="text" maxlength="180" data-field="todo-input" data-note-id="${escapeAttribute(note.id)}" placeholder="Neues To-do und Enter" class="todo-inline-input" />
     </div>
   `;
 }
@@ -411,15 +424,27 @@ function renderCounterPanelContent(note) {
   const percent = Math.min(100, Math.round((value / target) * 100));
   return `
     <div class="counter-compact">
+      <h3>Counter</h3>
       <div>
-        <p class="counter-now">${escapeHtml(String(value))}</p>
-        <p class="counter-target">Zielwert: ${escapeHtml(String(target))}</p>
+        <p class="counter-now">${escapeHtml(String(value))} / ${escapeHtml(String(target))}</p>
+        <p class="counter-target">Fortschritt</p>
       </div>
-      <button type="button" class="button-primary counter-plus-compact" data-action="confirm-counter-plus" data-note-id="${escapeAttribute(note.id)}">+1</button>
+      <button type="button" class="button-primary counter-plus-compact" data-action="confirm-counter-plus" data-note-id="${escapeAttribute(note.id)}">Bestätigen</button>
       <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}">
         <div class="preview-progress-fill" style="width:${percent}%;"></div>
       </div>
+      ${renderCounterLog(note)}
     </div>
+  `;
+}
+
+function renderCounterLog(note) {
+  const rows = normalizeCounterLog(note.counter_log).slice(0, 5);
+  if (!rows.length) return '<p class="note-preview-meta">Noch keine Bestätigungen.</p>';
+  return `
+    <ul class="counter-log minimal">
+      ${rows.map((entry) => `<li>${escapeHtml(entry.actor_name || 'Unbekannt')} · ${escapeHtml(formatTimestamp(entry.timestamp))}</li>`).join('')}
+    </ul>
   `;
 }
 
@@ -541,26 +566,6 @@ async function handlePanelClick(event) {
   const noteId = String(button.dataset.noteId || '').trim();
   if (!noteId) return;
 
-  if (button.dataset.action === 'save-text') {
-    await saveTextNote(noteId);
-    return;
-  }
-
-  if (button.dataset.action === 'save-todo-meta') {
-    await saveTodoMeta(noteId);
-    return;
-  }
-
-  if (button.dataset.action === 'add-todo-line') {
-    addTodoInputLine(noteId);
-    return;
-  }
-
-  if (button.dataset.action === 'save-counter-meta') {
-    await saveCounterMeta(noteId);
-    return;
-  }
-
   if (button.dataset.action === 'confirm-counter-plus') {
     await incrementCounter(noteId);
     return;
@@ -586,6 +591,7 @@ async function handlePanelClick(event) {
 
 async function handlePanelChange(event) {
   const action = String(event.target.dataset.action || '').trim();
+  const field = String(event.target.dataset.field || '').trim();
   const noteId = String(event.target.dataset.noteId || '').trim();
   if (!noteId) return;
 
@@ -600,6 +606,10 @@ async function handlePanelChange(event) {
     if (!file) return;
     await uploadAttachment(noteId, file);
     event.target.value = '';
+  }
+  if (field === 'todo-item-inline') {
+    const index = Number(event.target.dataset.index);
+    await saveTodoItemText(noteId, index, event.target.value);
   }
 }
 
@@ -622,6 +632,7 @@ async function toggleTodoItem(noteId, index, isChecked) {
 
 async function handleBoardChange(event) {
   const action = String(event.target.dataset.action || '').trim();
+  const field = String(event.target.dataset.field || '').trim();
   const noteId = String(event.target.dataset.noteId || '').trim();
   if (!noteId) return;
   if (action === 'toggle-todo') {
@@ -633,33 +644,42 @@ async function handleBoardChange(event) {
     await uploadAttachment(noteId, file);
     event.target.value = '';
   }
+  if (field === 'content-inline') {
+    await saveTextNote(noteId, event.target.value);
+  }
+  if (field === 'todo-item-inline') {
+    const index = Number(event.target.dataset.index);
+    await saveTodoItemText(noteId, index, event.target.value);
+  }
 }
 
 async function handleBoardKeydown(event) {
   if (event.key !== 'Enter') return;
+  const todoEditInput = event.target.closest('[data-field="todo-item-inline"]');
+  if (todoEditInput) {
+    event.preventDefault();
+    await addTodoItem(String(todoEditInput.dataset.noteId || '').trim());
+    return;
+  }
   const input = event.target.closest('[data-field="todo-input"]');
   if (!input) return;
   event.preventDefault();
   await addTodoItem(String(input.dataset.noteId || '').trim(), input);
 }
 
-function addTodoInputLine(noteId) {
-  const container = elements.panelContent?.querySelector(`[data-block="todo-multi"][data-note-id="${noteId}"]`);
-  if (!container) return;
-  const row = document.createElement('div');
-  row.className = 'todo-input-row';
-  row.innerHTML = `<input type="text" maxlength="180" data-field="todo-batch-input" data-note-id="${escapeAttribute(noteId)}" placeholder="To-do eingeben" />`;
-  container.appendChild(row);
-  row.querySelector('input')?.focus();
-}
-
-function handlePanelKeydown(event) {
+async function handlePanelKeydown(event) {
   if (event.key !== 'Enter') return;
-  const targetInput = event.target.closest('[data-field="todo-batch-input"]');
+  const itemEditor = event.target.closest('[data-field="todo-item-inline"]');
+  if (itemEditor) {
+    event.preventDefault();
+    await addTodoItem(String(itemEditor.dataset.noteId || '').trim());
+    return;
+  }
+  const targetInput = event.target.closest('[data-field="todo-input"]');
   if (!targetInput) return;
   event.preventDefault();
   const noteId = String(targetInput.dataset.noteId || '').trim();
-  addTodoInputLine(noteId);
+  await addTodoItem(noteId, targetInput);
 }
 
 function updateCreateTypeFields() {
@@ -685,11 +705,11 @@ function openCreateNoteForm() {
   }
 }
 
-async function saveTextNote(noteId) {
-  const contentInput = document.querySelector(`[data-field="content"][data-note-id="${noteId}"]`);
+async function saveTextNote(noteId, directValue = null) {
+  const contentInput = document.querySelector(`[data-field="content"][data-note-id="${noteId}"], [data-field="content-inline"][data-note-id="${noteId}"]`);
   const payload = {
     title: '',
-    content: String(contentInput?.value || '').trim(),
+    content: String((directValue ?? contentInput?.value) || '').trim(),
   };
   if (!payload.content) {
     showAlert('Notiz darf nicht leer sein.', true);
@@ -734,6 +754,23 @@ async function addTodoItem(noteId, inputElement = null) {
     showAlert(`To-do konnte nicht hinzugefügt werden: ${error.message}`, true);
     return;
   }
+  if (input) input.value = '';
+  await loadData();
+}
+
+async function saveTodoItemText(noteId, index, nextText) {
+  const note = state.notes.find((entry) => String(entry.id) === noteId);
+  if (!note) return;
+  const items = normalizeTodoItems(note.todo_items);
+  if (!items[index]) return;
+  const text = String(nextText || '').trim();
+  if (!text) return;
+  items[index].text = text;
+  const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: items }).eq('id', noteId);
+  if (error) {
+    showAlert(`To-do konnte nicht aktualisiert werden: ${error.message}`, true);
+    return;
+  }
   await loadData();
 }
 
@@ -751,26 +788,7 @@ async function saveUnifiedNote(noteId) {
   }
   if (type === 'todo') {
     await saveTodoMeta(noteId);
-    await saveTodoBatch(noteId);
   }
-}
-
-async function saveTodoBatch(noteId) {
-  const note = state.notes.find((entry) => String(entry.id) === noteId);
-  if (!note) return;
-  const batchInputs = Array.from(elements.panelContent?.querySelectorAll(`[data-field="todo-batch-input"][data-note-id="${noteId}"]`) || []);
-  const additions = batchInputs.map((input) => String(input.value || '').trim()).filter(Boolean);
-  if (!additions.length) return;
-  const items = normalizeTodoItems(note.todo_items);
-  additions.forEach((text) => {
-    items.push({ text, done: false, done_by_uid: null, done_by_name: null, done_at: null });
-  });
-  const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: items }).eq('id', noteId);
-  if (error) {
-    showAlert(`To-dos konnten nicht gespeichert werden: ${error.message}`, true);
-    return;
-  }
-  await loadData();
 }
 
 async function saveCounterMeta(noteId) {
