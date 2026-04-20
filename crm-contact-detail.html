@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CRM Kontakt</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./crm-contact-detail.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script defer src="./crm-contact-detail.js"></script>
+  </head>
+  <body>
+    <main class="detail-shell">
+      <header class="panel detail-header">
+        <div>
+          <span class="eyebrow">CRM</span>
+          <h1 id="contactTitle">Kontakt</h1>
+          <p id="contactMeta" class="subtle-text">–</p>
+        </div>
+        <button id="backButton" class="button" type="button">Zurück</button>
+      </header>
+
+      <section class="panel">
+        <h2>Kontaktinformationen</h2>
+        <dl id="contactInfo" class="info-grid"></dl>
+      </section>
+
+      <section class="panel">
+        <h2>Neue Notiz</h2>
+        <div id="alert" class="alert hidden"></div>
+        <form id="noteForm" class="form-grid">
+          <label>
+            <span>Absender *</span>
+            <select id="senderUidInput" required></select>
+          </label>
+          <label>
+            <span>Empfänger</span>
+            <select id="recipientUidInput"></select>
+          </label>
+          <label>
+            <span>Kategorisierung</span>
+            <select id="noteCategoryInput">
+              <option value="information">Information</option>
+              <option value="aufgabe">Aufgabe</option>
+              <option value="rueckfrage">Rückfrage</option>
+            </select>
+          </label>
+          <label>
+            <span>Note Ranking</span>
+            <select id="noteRankingInput">
+              <option value="3">3 - Wichtig</option>
+              <option value="2" selected>2 - Normal</option>
+              <option value="1">1 - Unwichtig</option>
+            </select>
+          </label>
+          <label class="full-width">
+            <span>Kommentar *</span>
+            <textarea id="noteTextInput" rows="4" required></textarea>
+          </label>
+          <label class="full-width">
+            <span>Attachment (PDF)</span>
+            <input id="noteAttachmentInput" type="file" accept="application/pdf,.pdf" multiple />
+          </label>
+          <div class="full-width">
+            <button id="saveNoteButton" class="button" type="submit">Notiz speichern</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Notizen</h2>
+        <ul id="notesList" class="notes-list"></ul>
+      </section>
+    </main>
+  </body>
+</html>

@@ -1,1 +1,914 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wochenrapport Webplattform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+    <script defer src="./script.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <section id="loginView" class="login-view view active">
+        <div class="login-card panel">
+          <div class="brand-block">
+            <span class="eyebrow">Neue Webfassung</span>
+            <h1>Wochenrapport-System</h1>
+            <p>
+              Desktop-Plattform für Rapporte, Ferien-/Absenzanträge und den wöchentlichen
+              Gesamtexport als PDF.
+            </p>
+          </div>
 
+          <form id="loginForm" class="login-form">
+            <label>
+              <span>E-Mail</span>
+              <input id="emailInput" type="email" placeholder="admin@maraschow.cn" required />
+            </label>
+            <label>
+              <span>Passwort</span>
+              <input id="passwordInput" type="password" placeholder="••••••••" required />
+            </label>
+            <button type="submit" class="button button-primary">Einloggen</button>
+            <p class="helper-text">
+              Vollzugriff gibt es nur für Profile mit <code>is_admin = true</code>. Die passenden
+              Supabase-/Storage-Regeln findest du in <code>supabase-schema.sql</code>.
+            </p>
+          </form>
+
+          <div id="loginAlert" class="alert hidden"></div>
+        </div>
+      </section>
+
+      <section id="appView" class="dashboard view hidden">
+        <aside class="sidebar panel">
+          <nav class="nav-tabs">
+            <button class="nav-tab active" data-page="reports" type="button" title="Wochenrapporte" aria-label="Wochenrapporte">
+              <span class="nav-tab-icon" aria-hidden="true">📅</span>
+              <span class="visually-hidden">Wochenrapporte</span>
+            </button>
+            <button class="nav-tab" data-page="absences" type="button" title="Ferien &amp; Absenzen" aria-label="Ferien und Absenzen">
+              <span class="nav-tab-icon" aria-hidden="true">🏖️</span>
+              <span class="visually-hidden">Ferien und Absenzen</span>
+            </button>
+            <button class="nav-tab" data-page="saldo" type="button" title="Saldo" aria-label="Saldo">
+              <span class="nav-tab-icon" aria-hidden="true">⚖️</span>
+              <span class="visually-hidden">Saldo</span>
+            </button>
+            <button class="nav-tab" data-page="projects" type="button" title="Projekte" aria-label="Projekte">
+              <span class="nav-tab-icon" aria-hidden="true">🏗️</span>
+              <span class="visually-hidden">Projekte</span>
+            </button>
+            <button class="nav-tab" data-page="dispo" type="button" title="Dispo" aria-label="Dispo">
+              <span class="nav-tab-icon" aria-hidden="true">🗓️</span>
+              <span class="visually-hidden">Dispo</span>
+            </button>
+            <button class="nav-tab" data-page="crm" type="button" title="CRM" aria-label="CRM">
+              <span class="nav-tab-icon" aria-hidden="true">🧾</span>
+              <span class="visually-hidden">CRM</span>
+            </button>
+            <button class="nav-tab" data-page="settings" type="button" title="Einstellungen" aria-label="Einstellungen">
+              <span class="nav-tab-icon" aria-hidden="true">⚙️</span>
+              <span class="visually-hidden">Einstellungen</span>
+            </button>
+          </nav>
+
+          <div class="sidebar-footer">
+            <button id="logoutButton" class="button button-ghost sidebar-logout" type="button" title="Ausloggen" aria-label="Ausloggen">↩</button>
+          </div>
+        </aside>
+
+        <main class="content-area">
+          <header class="topbar panel">
+            <div>
+              <span class="eyebrow">Übersicht</span>
+              <h2 id="pageTitle">Wochenrapporte</h2>
+            </div>
+            <div class="status-panel">
+              <div class="status-row">
+                <span id="connectionBadge" class="badge badge-soft">Verbindung wird geprüft</span>
+                <button id="connectionRefreshButton" class="button button-secondary button-icon" type="button" aria-label="Daten aktualisieren">↻</button>
+              </div>
+              <span id="dataTimestamp" class="subtle-text">Noch keine Daten geladen</span>
+            </div>
+          </header>
+
+          <section id="reportsPage" class="page active">
+            <div class="toolbar panel">
+              <div class="week-toolbar" aria-label="Kalenderwoche Navigation">
+                <button id="previousWeekButton" class="button button-secondary button-icon" type="button" aria-label="Vorherige Woche">←</button>
+                <div class="week-summary">
+                  <input id="weekPicker" type="week" class="visually-hidden" tabindex="-1" aria-hidden="true" />
+                  <span class="subtle-label">Kalenderwoche</span>
+                  <strong id="weekLabel">KW 00</strong>
+                  <span id="weekDateRange" class="subtle-text">00.00.0000 – 00.00.0000</span>
+                </div>
+                <button id="nextWeekButton" class="button button-secondary button-icon" type="button" aria-label="Nächste Woche">→</button>
+              </div>
+              <div class="toolbar-group toolbar-actions">
+                <button
+                  id="reportStatusButton"
+                  class="button button-secondary report-status-button"
+                  type="button"
+                  aria-live="polite"
+                  disabled
+                >
+                  <span id="reportStatusIcon" class="report-status-icon" aria-hidden="true">0</span>
+                  <span id="reportStatusText">fehlende Wochenrapporte</span>
+                </button>
+                <button id="exportPdfButton" class="button button-primary">PDF exportieren</button>
+              </div>
+            </div>
+
+            <div class="panel table-panel report-overview-panel">
+              <div class="section-heading report-section-heading">
+                <div>
+                  <h3>Alle Rapporte der gewählten Woche</h3>
+                  <p>
+                    Zeigt alle Mitarbeiter mit ihren Einträgen. Der Export bündelt daraus ein
+                    gemeinsames PDF inklusive Bildanhängen.
+                  </p>
+                </div>
+                <div class="report-filter-summary subtle-text" id="selectedEmployeesSummary"></div>
+              </div>
+
+              <div class="report-filter-panel">
+                <div class="report-filter-toolbar">
+                  <label>
+                    <span>Mitarbeiter filtern</span>
+                    <input id="employeeFilterInput" type="search" placeholder="Nach Vor- oder Nachname suchen" />
+                  </label>
+                  <div class="report-filter-actions">
+                    <button id="selectAllEmployeesButton" class="button button-secondary" type="button">Alle wählen</button>
+                    <button id="clearEmployeeSelectionButton" class="button button-secondary" type="button">Auswahl leeren</button>
+                    <label class="checkbox-inline with-icon report-controlled-toggle" title="Kontrollierte Rapporte anzeigen">
+                      <span aria-hidden="true">🛡️</span>
+                      <input id="showControlledReportsInput" type="checkbox" />
+                    </label>
+                  </div>
+                </div>
+                <div class="employee-directory-heading">
+                  <strong>Alle Mitarbeitenden</strong>
+                  <span class="subtle-text">Maximal 5 Treffer werden angezeigt.</span>
+                </div>
+                <div id="employeeFilterList" class="employee-filter-list"></div>
+              </div>
+
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Mitarbeiter</th>
+                      <th>Kontrolle</th>
+                      <th>Datum</th>
+                      <th>Kommission</th>
+                      <th>Zeit</th>
+                      <th>Arbeitszeit</th>
+                      <th>Bereinigte Arbeitszeit</th>
+                      <th>Spesen</th>
+                      <th>Anhänge</th>
+                      <th>Aktion</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reportsTableBody"></tbody>
+                </table>
+              </div>
+
+              <div class="table-pagination">
+                <button id="reportsPrevPageButton" class="button button-secondary" type="button">Zurück</button>
+                <div id="reportsPaginationSummary" class="subtle-text">Seite 1</div>
+                <button id="reportsNextPageButton" class="button button-secondary" type="button">Weiter</button>
+              </div>
+            </div>
+
+            <div class="grid-two">
+              <div class="panel report-status-panel">
+                <div class="section-heading compact">
+                  <div>
+                    <h3>Rapport-Abgabe pro Mitarbeiter</h3>
+                    <p>Zeigt je Mitarbeiter den aktuellen Stand der Abgabe in der gewählten Woche.</p>
+                  </div>
+                </div>
+                <ul id="submissionList" class="status-list"></ul>
+              </div>
+
+              <div class="panel report-status-panel">
+                <div class="section-heading compact">
+                  <div>
+                    <h3>Fehlende Rapporte</h3>
+                    <p>Diese Profile haben in der gewählten Woche noch nichts eingereicht.</p>
+                  </div>
+                </div>
+                <ul id="missingList" class="status-list"></ul>
+              </div>
+            </div>
+          </section>
+
+          <section id="absencesPage" class="page hidden">
+            <div class="panel table-panel">
+              <div class="section-heading">
+                <div>
+                  <h3>Ferien- und Absenzanträge</h3>
+                  <p>
+                    Für zentrale Prüfung von Ferien, Krankheit, Unfall, Militär und weiteren
+                    Absenzarten.
+                  </p>
+                </div>
+                <button
+                  id="openConfirmationsModalButton"
+                  class="button button-secondary button-icon"
+                  type="button"
+                  aria-label="Bestätigte Absenzen anzeigen"
+                  title="Bestätigte Absenzen anzeigen"
+                >
+                  ✅
+                </button>
+              </div>
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Mitarbeiter</th>
+                      <th>Typ</th>
+                      <th>Von</th>
+                      <th>Bis</th>
+                      <th>Bemerkung</th>
+                      <th>Anhänge</th>
+                      <th>Bestätigung PL</th>
+                      <th>Bestätigung GL</th>
+                      <th>Ablehnen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="absencesTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="saldoPage" class="page hidden">
+            <div class="panel table-panel">
+              <div class="section-heading">
+                <div>
+                  <h3>Saldo</h3>
+                  <p>
+                    Übersicht pro Profil mit manuell gepflegten Startwerten und automatisch
+                    verbuchten Stunden bei bestätigten Wochenrapporten.
+                  </p>
+                </div>
+              </div>
+
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>E-Mail</th>
+                      <th>Ferienguthaben (h)</th>
+                      <th>Bezogene Ferien (h)</th>
+                      <th>Übertrag Überstunden (h)</th>
+                      <th>Rapportierte Stunden (h)</th>
+                      <th>Gutgeschriebene Stunden (h)</th>
+                      <th>Wochenstunden</th>
+                      <th>Überstundensaldo (h)</th>
+                      <th>Feriensaldo (h)</th>
+                      <th>Aktion</th>
+                    </tr>
+                  </thead>
+                  <tbody id="saldoTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="projectsPage" class="page hidden">
+            <div class="panel table-panel">
+              <div class="section-heading">
+                <div>
+                  <h3>Projekte / Aufträge</h3>
+                  <p>Projekte verwalten und Projektleiter/Bauleiter zuweisen.</p>
+                </div>
+              </div>
+              <div id="projectsAlert" class="alert hidden"></div>
+              <div class="report-filter-panel">
+                <div class="report-filter-toolbar">
+                  <label>
+                    <span>Suche</span>
+                    <input id="projectSearchInput" type="search" placeholder="Nach Kommissionsnummer oder Projektname suchen" />
+                  </label>
+                  <div class="report-filter-actions">
+                    <button id="openProjectModalButton" class="button button-primary button-icon" type="button" title="Projekt hinzufügen" aria-label="Projekt hinzufügen">+</button>
+                  </div>
+                </div>
+              </div>
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Kommissionsnummer</th>
+                      <th>Projektname</th>
+                      <th>Projektleiter</th>
+                      <th>Bauleiter</th>
+                      <th>Spesen</th>
+                      <th>Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="projectsTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="projectDetailPage" class="page hidden">
+            <div class="panel table-panel">
+              <div class="section-heading">
+                <div>
+                  <h3 id="projectDetailTitle">Projekt</h3>
+                  <p>Projekt-Detailseite (Platzhalter).</p>
+                </div>
+                <button id="backToProjectsButton" class="button button-secondary" type="button">Zurück</button>
+              </div>
+              <p class="subtle-text">Hier folgt die Detailansicht für das ausgewählte Projekt.</p>
+            </div>
+          </section>
+
+          <section id="dispoPage" class="page hidden">
+            <div id="dispoAlert" class="alert hidden"></div>
+            <div class="panel toolbar dispo-toolbar">
+              <div class="week-toolbar" aria-label="Kalenderwoche Navigation">
+                <button id="dispoPreviousWeekButton" class="button button-secondary button-icon" type="button" aria-label="Vorherige Woche">←</button>
+                <div class="week-summary">
+                  <span class="subtle-label">Kalenderwoche</span>
+                  <strong id="dispoWeekLabel">KW 00</strong>
+                  <span id="dispoWeekDateRange" class="subtle-text">00.00.0000 – 00.00.0000</span>
+                </div>
+                <button id="dispoNextWeekButton" class="button button-secondary button-icon" type="button" aria-label="Nächste Woche">→</button>
+              </div>
+              <div class="toolbar-group toolbar-actions">
+                <label class="checkbox-inline with-icon">
+                  <span aria-hidden="true">🧩</span>
+                  <input id="dispoMultiEntryInput" type="checkbox" />
+                  <span>Mehrere Einträge pro Tag</span>
+                </label>
+                <button id="dispoGapSearchButton" class="button button-secondary" type="button">Freie Lücken suchen</button>
+                <button id="dispoExportPdfButton" class="button button-secondary" type="button">Dispo als PDF</button>
+              </div>
+            </div>
+            <div id="dispoGapResults" class="panel hidden dispo-gap-results" aria-live="polite"></div>
+            <div class="panel table-panel dispo-matrix-panel">
+              <div class="table-wrapper">
+                <table class="dispo-table">
+                  <thead id="dispoTableHead"></thead>
+                  <tbody id="dispoTableBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section id="crmPage" class="page hidden">
+            <div class="panel table-panel">
+              <div class="section-heading">
+                <div>
+                  <h3>CRM Kontakte</h3>
+                  <p>
+                    Kontakte zentral erfassen, kategorisieren und mit Notizen pro Datensatz
+                    dokumentieren.
+                  </p>
+                </div>
+                <button id="openCrmCreateModalButton" class="button button-primary button-icon" type="button" title="Neuen Kontakt erstellen" aria-label="Neuen Kontakt erstellen">
+                  +
+                </button>
+              </div>
+              <div id="crmAlert" class="alert hidden"></div>
+
+              <div id="crmContactListView">
+                <div class="report-filter-toolbar crm-filter-toolbar">
+                  <label>
+                    <span>Suche</span>
+                    <input id="crmSearchInput" type="search" placeholder="Nach Firma oder Vor-/Nachname suchen" />
+                  </label>
+                  <label>
+                    <span>Kategorie</span>
+                    <select id="crmCategoryFilterInput">
+                      <option value="">Alle Kategorien</option>
+                      <option value="kunde">Kunde</option>
+                      <option value="lieferant">Lieferant</option>
+                      <option value="elektroplaner">Elektroplaner</option>
+                      <option value="subunternehmer">Subunternehmer</option>
+                      <option value="unternehmer">Unternehmer</option>
+                    </select>
+                  </label>
+                </div>
+
+                <div class="table-wrapper">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Kategorie</th>
+                        <th>Firma</th>
+                        <th>Vorname</th>
+                        <th>Nachname</th>
+                        <th>Telefon</th>
+                        <th>E-Mail</th>
+                        <th>Aktion</th>
+                      </tr>
+                    </thead>
+                    <tbody id="crmContactsTableBody"></tbody>
+                  </table>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+          <section id="settingsPage" class="page hidden">
+            <div class="panel table-panel">
+              <div class="section-heading">
+                <div>
+                  <h3>Einstellungen</h3>
+                  <p>Benutzer aktivieren/deaktivieren und Feiertage zentral verwalten.</p>
+                </div>
+              </div>
+              <div class="settings-grid">
+                <article class="mini-card settings-card settings-users-card">
+                  <h4>Benutzerverwaltung</h4>
+                  <p class="subtle-text">
+                    Deaktivierte Benutzer werden in den Planungen und Filtern ausgeblendet,
+                    können aber wieder aktiviert oder vollständig entfernt werden.
+                  </p>
+                  <div class="table-wrapper">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>E-Mail</th>
+                          <th>Rolle</th>
+                          <th>Schultag</th>
+                          <th>Blocktag</th>
+                          <th>Sollerlös (CHF)</th>
+                          <th>Status</th>
+                          <th>Aktion</th>
+                        </tr>
+                      </thead>
+                      <tbody id="settingsUsersTableBody"></tbody>
+                    </table>
+                  </div>
+                </article>
+
+                <article class="mini-card settings-card settings-holidays-card">
+                  <h4>Feiertage</h4>
+                  <p class="subtle-text">
+                    Feiertage blockieren alle Absenzen (inkl. Berufsschule) und haben immer Priorität;
+                    normale Arbeitsrapporte können am Feiertag zusätzlich erfasst werden.
+                  </p>
+                  <form id="holidayForm" class="settings-form">
+                    <label>
+                      <span>Datum</span>
+                      <input id="holidayDateInput" type="date" required />
+                    </label>
+                    <label>
+                      <span>Bezeichnung</span>
+                      <input id="holidayNameInput" type="text" maxlength="120" placeholder="z. B. Ostermontag" required />
+                    </label>
+                    <label>
+                      <span>Vergütung</span>
+                      <select id="holidayIsPaidInput">
+                        <option value="true" selected>Bezahlt</option>
+                        <option value="false">Unbezahlt</option>
+                      </select>
+                    </label>
+                    <button id="saveHolidayButton" class="button button-primary" type="submit">Feiertag hinzufügen</button>
+                  </form>
+                  <div class="table-wrapper">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Datum</th>
+                          <th>Bezeichnung</th>
+                          <th>Vergütung</th>
+                          <th>Aktion</th>
+                        </tr>
+                      </thead>
+                      <tbody id="settingsHolidaysTableBody"></tbody>
+                    </table>
+                  </div>
+                </article>
+
+                <article class="mini-card settings-card settings-vacations-card">
+                  <h4>Ferienzeit (Berufsschule pausieren)</h4>
+                  <p class="subtle-text">
+                    In diesen Zeitfenstern werden keine automatischen Berufsschultage eingetragen.
+                  </p>
+                  <form id="schoolVacationForm" class="settings-form">
+                    <label>
+                      <span>Von</span>
+                      <input id="schoolVacationStartInput" type="date" required />
+                    </label>
+                    <label>
+                      <span>Bis</span>
+                      <input id="schoolVacationEndInput" type="date" required />
+                    </label>
+                    <button id="saveSchoolVacationButton" class="button button-primary" type="submit">Ferienzeit hinzufügen</button>
+                  </form>
+                  <div class="table-wrapper">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Von</th>
+                          <th>Bis</th>
+                          <th>Aktion</th>
+                        </tr>
+                      </thead>
+                      <tbody id="settingsSchoolVacationsTableBody"></tbody>
+                    </table>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </section>
+        </main>
+      </section>
+
+      <section id="accessDeniedView" class="login-view view hidden">
+        <div class="login-card panel access-denied-card">
+          <div class="brand-block">
+            <span class="eyebrow">Kein Zugriff</span>
+            <h1>Hey, du kannst hier leider nichts bearbeiten.</h1>
+            <p>
+              Du bist zwar erfolgreich angemeldet, aber dein Benutzer ist nicht als Admin freigegeben.
+            </p>
+          </div>
+
+          <div class="alert">
+            Sobald dein Profil in <code>app_profiles</code> den Wert <code>is_admin = true</code> hat,
+            wird die Bearbeitungsansicht automatisch verfügbar.
+          </div>
+
+          <button id="accessDeniedLogoutButton" type="button" class="button button-ghost">
+            Ausloggen
+          </button>
+        </div>
+      </section>
+
+      <div id="reportEditModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="reportEditTitle">
+        <div class="modal-backdrop" data-close-modal="true"></div>
+        <div class="modal-card panel">
+          <div class="section-heading compact">
+            <div>
+              <h3 id="reportEditTitle">Rapport bearbeiten</h3>
+              <p>Bestehende Rapporte können hier kontrolliert und angepasst werden.</p>
+            </div>
+            <button id="closeReportEditModalButton" class="button button-ghost" type="button">Schliessen</button>
+          </div>
+
+          <form id="reportEditForm" class="report-edit-form">
+            <input id="editReportId" type="hidden" />
+            <div class="report-edit-grid">
+              <label>
+                <span>Mitarbeiter</span>
+                <input id="editEmployeeName" type="text" readonly />
+              </label>
+              <label>
+                <span>Datum</span>
+                <input id="editWorkDate" type="date" required />
+              </label>
+              <label>
+                <span>Kommission</span>
+                <input id="editCommissionNumber" type="text" />
+              </label>
+              <label>
+                <span>Start</span>
+                <input id="editStartTime" type="time" />
+              </label>
+              <label>
+                <span>Ende</span>
+                <input id="editEndTime" type="time" />
+              </label>
+              <label>
+                <span>Arbeitsminuten</span>
+                <input id="editTotalMinutes" type="number" min="0" step="15" />
+              </label>
+              <label>
+                <span>Pausenminuten</span>
+                <input id="editPauseMinutes" type="number" min="0" step="5" />
+              </label>
+              <label>
+                <span>Spesen</span>
+                <input id="editExpensesAmount" type="number" min="0" step="0.05" />
+              </label>
+              <label>
+                <span>Weitere Kosten</span>
+                <input id="editOtherCostsAmount" type="number" min="0" step="0.05" />
+              </label>
+            </div>
+            <label>
+              <span>Bemerkungen</span>
+              <textarea id="editNotes" rows="4" placeholder="Bemerkungen zum Rapport"></textarea>
+            </label>
+            <div>
+              <strong>Anhang</strong>
+              <div id="reportEditAttachments" class="attachment-list"></div>
+            </div>
+            <div class="modal-actions">
+              <button class="button button-secondary" type="button" id="cancelReportEditButton">Abbrechen</button>
+              <button class="button button-primary" type="submit">Änderungen speichern</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="adjustedMinutesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adjustedMinutesTitle">
+        <div class="modal-backdrop" data-close-adjusted-modal="true"></div>
+        <div class="modal-card panel modal-card-compact">
+          <div class="section-heading compact">
+            <div>
+              <h3 id="adjustedMinutesTitle">Bereinigte Arbeitszeit bearbeiten</h3>
+              <p>Diese Zeit wird beim Bestätigen/Verbuchen verwendet.</p>
+            </div>
+            <button id="closeAdjustedMinutesModalButton" class="button button-ghost" type="button">Schliessen</button>
+          </div>
+
+          <form id="adjustedMinutesForm" class="report-edit-form">
+            <input id="adjustedReportId" type="hidden" />
+            <label>
+              <span>Bereinigte Arbeitszeit (Minuten)</span>
+              <input id="adjustedMinutesInput" type="number" min="0" step="15" required />
+            </label>
+            <div class="modal-actions">
+              <button id="cancelAdjustedMinutesButton" class="button button-secondary" type="button">Abbrechen</button>
+              <button class="button button-primary" type="submit">Speichern</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="dispoAssignModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="dispoAssignTitle">
+        <div class="modal-backdrop" data-close-dispo-assign-modal="true"></div>
+        <div class="modal-card panel">
+          <div class="section-heading compact">
+            <div>
+              <h3 id="dispoAssignTitle">Dispo zuweisen</h3>
+              <p id="dispoAssignTargetLabel">Auswahl treffen.</p>
+            </div>
+            <button id="closeDispoAssignModalButton" class="button button-ghost" type="button">Schliessen</button>
+          </div>
+          <form id="dispoAssignForm" class="report-edit-form">
+            <div class="dispo-assign-options">
+              <h4>Projekte</h4>
+              <div id="dispoAssignProjectsList" class="dispo-option-list"></div>
+              <h4>Schnellauswahl</h4>
+              <div id="dispoAssignSpecialList" class="dispo-option-list"></div>
+            </div>
+            <div class="report-form-grid">
+              <label>
+                <span>Beginn</span>
+                <input id="dispoAssignStartTime" type="time" value="07:00" />
+              </label>
+              <label>
+                <span>Ende</span>
+                <input id="dispoAssignEndTime" type="time" value="16:30" />
+              </label>
+            </div>
+            <div class="modal-actions">
+              <button id="cancelDispoAssignButton" class="button button-secondary" type="button">Abbrechen</button>
+              <button class="button button-primary" type="submit">Zuweisen</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="dispoGapSearchModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="dispoGapSearchTitle">
+        <div class="modal-backdrop" data-close-dispo-gap-search-modal="true"></div>
+        <div class="modal-card panel modal-card-compact">
+          <div class="modal-header">
+            <h3 id="dispoGapSearchTitle">Freie Lücken suchen</h3>
+            <button id="closeDispoGapSearchModalButton" class="button button-secondary button-small" type="button">Schliessen</button>
+          </div>
+          <form id="dispoGapSearchForm">
+            <label>
+              <span>Kalenderwoche von</span>
+              <input id="dispoGapWeekFromInput" type="week" required />
+            </label>
+            <label>
+              <span>Kalenderwoche bis (optional)</span>
+              <input id="dispoGapWeekToInput" type="week" />
+            </label>
+            <label>
+              <span>Mindestlücke (Stunden)</span>
+              <input id="dispoGapMinimumHoursInput" type="number" min="0.5" step="0.5" value="4" required />
+            </label>
+            <p id="dispoGapServiceProfiles" class="subtle-text"></p>
+            <p class="subtle-text">Es werden nur aktive Mitarbeitende mit Rolle <strong>Service</strong> gesucht (max. 3 Kalenderwochen).</p>
+            <div class="modal-actions">
+              <button id="cancelDispoGapSearchButton" class="button button-secondary" type="button">Abbrechen</button>
+              <button class="button button-primary" type="submit">Lücken suchen</button>
+            </div>
+          </form>
+          <div id="dispoGapModalResults" class="panel dispo-gap-results hidden" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div id="projectModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="projectModalTitle">
+        <div class="modal-backdrop" data-close-project-modal="true"></div>
+        <div class="modal-card panel">
+          <div class="section-heading compact">
+            <div>
+              <h3 id="projectModalTitle">Projekt erfassen</h3>
+              <p>Projekt über ein Popup erfassen oder bearbeiten.</p>
+            </div>
+            <button id="closeProjectModalButton" class="button button-ghost" type="button">Schliessen</button>
+          </div>
+          <form id="projectForm" class="report-edit-form">
+            <input id="projectIdInput" type="hidden" />
+            <div class="projects-form-grid">
+              <label>
+                <span>Kommissionsnummer *</span>
+                <input id="projectCommissionInput" type="text" required />
+              </label>
+              <label>
+                <span>Projektname *</span>
+                <input id="projectNameInput" type="text" required />
+              </label>
+              <label>
+                <span>Bauleiter *</span>
+                <select id="constructionLeadSelect" required></select>
+              </label>
+              <label>
+                <span>Projektleiter *</span>
+                <select id="projectLeadSelect" required></select>
+              </label>
+              <label class="checkbox-label">
+                <input id="projectExpensesAllowedInput" type="checkbox" checked />
+                <span>Spesen auf Projekt erlaubt</span>
+              </label>
+            </div>
+            <div class="modal-actions">
+              <button id="resetProjectFormButton" class="button button-secondary" type="button">Neu</button>
+              <button id="saveProjectButton" class="button button-primary" type="submit">Speichern</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="confirmationsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="confirmationsModalTitle">
+        <div class="modal-backdrop" data-close-confirmations-modal="true"></div>
+        <div class="modal-card panel">
+          <div class="section-heading compact">
+            <div>
+              <h3 id="confirmationsModalTitle">Bestätigte Absenzen</h3>
+              <p>Standardmässig werden nur aktuelle und zukünftige Einträge gezeigt.</p>
+            </div>
+            <button id="closeConfirmationsModalButton" class="button button-ghost" type="button">Schliessen</button>
+          </div>
+
+          <div class="report-filter-panel confirmation-filter-panel">
+            <div class="report-filter-toolbar">
+              <label class="checkbox-inline">
+                <input id="includeConfirmationHistoryInput" type="checkbox" />
+                <span>Historie anzeigen</span>
+              </label>
+              <div class="report-filter-actions">
+                <button id="exportConfirmationsPdfButton" class="button button-secondary" type="button">Alle gefilterten als PDF</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Person</th>
+                  <th>Typ</th>
+                  <th>Von - Bis</th>
+                  <th>Bestätigt durch</th>
+                  <th>Ausgelöst am</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody id="confirmationsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="blockDayModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="blockDayTitle">
+        <div class="modal-backdrop" data-close-block-day-modal="true"></div>
+        <div class="modal-card panel modal-card-compact">
+          <div class="section-heading compact">
+            <div>
+              <h3 id="blockDayTitle">Blocktage verwalten</h3>
+              <p>Wiederkehrende Sperrzeiten pro Wochentag für ein Kalenderjahr (z. B. 07:00 bis 12:00).</p>
+            </div>
+            <button id="closeBlockDayModalButton" class="button button-ghost" type="button">Schliessen</button>
+          </div>
+
+          <form id="blockDayForm" class="report-edit-form">
+            <input id="blockDayProfileIdInput" type="hidden" />
+            <label>
+              <span>Kalenderjahr</span>
+              <input id="blockDayYearInput" type="number" min="2000" max="2100" required />
+            </label>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Tag</th>
+                    <th>Blockiert</th>
+                    <th>Von</th>
+                    <th>Bis</th>
+                  </tr>
+                </thead>
+                <tbody id="blockDayOptionsBody"></tbody>
+              </table>
+            </div>
+            <div class="modal-actions">
+              <button id="cancelBlockDayButton" class="button button-secondary" type="button">Abbrechen</button>
+              <button class="button button-primary" type="submit">Fertig</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="crmContactModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="crmContactModalTitle">
+        <div class="modal-backdrop" data-close-crm-contact-modal="true"></div>
+        <div class="modal-card panel">
+          <div class="section-heading">
+            <div>
+              <h3 id="crmContactModalTitle">CRM Kontakt</h3>
+              <p>Neuen Kontakt erfassen oder bestehenden Kontakt bearbeiten.</p>
+            </div>
+          </div>
+          <form id="crmContactForm" class="settings-form">
+            <input id="crmContactIdInput" type="hidden" />
+            <div class="crm-form-grid">
+              <label>
+                <span>Kategorie</span>
+                <select id="crmCategoryInput" required>
+                  <option value="kunde">Kunde</option>
+                  <option value="lieferant">Lieferant</option>
+                  <option value="elektroplaner">Elektroplaner</option>
+                  <option value="subunternehmer">Subunternehmer</option>
+                  <option value="unternehmer">Unternehmer</option>
+                </select>
+              </label>
+              <label>
+                <span>Firma (optional)</span>
+                <input id="crmCompanyInput" type="text" maxlength="180" placeholder="Muster AG" />
+              </label>
+              <label>
+                <span>Vorname</span>
+                <input id="crmFirstNameInput" type="text" maxlength="120" required />
+              </label>
+              <label>
+                <span>Nachname</span>
+                <input id="crmLastNameInput" type="text" maxlength="120" required />
+              </label>
+              <label>
+                <span>Strasse</span>
+                <input id="crmStreetInput" type="text" maxlength="180" />
+              </label>
+              <label>
+                <span>Ort</span>
+                <input id="crmCityInput" type="text" maxlength="120" />
+              </label>
+              <label>
+                <span>Postleitzahl</span>
+                <input id="crmPostalCodeInput" type="text" maxlength="20" />
+              </label>
+              <label>
+                <span>Telefon</span>
+                <input id="crmPhoneInput" type="text" maxlength="50" />
+              </label>
+              <label>
+                <span>E-Mail</span>
+                <input id="crmEmailInput" type="email" maxlength="180" />
+              </label>
+            </div>
+            <div class="modal-actions">
+              <button id="saveCrmContactButton" class="button button-primary" type="submit">Kontakt speichern</button>
+              <button id="resetCrmContactFormButton" class="button button-secondary" type="button">Zurücksetzen</button>
+              <button id="closeCrmContactModalButton" class="button button-secondary" type="button">Schliessen</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div id="loadingOverlay" class="loading-overlay hidden" aria-live="polite" aria-busy="true">
+        <div class="loading-card panel">
+          <div class="spinner" aria-hidden="true"></div>
+          <strong>Bitte warten…</strong>
+          <p id="loadingOverlayText">Aktion wird ausgeführt.</p>
+        </div>
+      </div>
+
+    </div>
+  </body>
+</html>

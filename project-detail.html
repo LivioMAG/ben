@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Projektübersicht</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./project-detail.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script defer src="./project-detail.js"></script>
+  </head>
+  <body>
+    <div class="detail-shell">
+      <aside class="detail-sidebar" aria-label="Projektnavigation">
+        <div class="nav-icon-list">
+          <button id="dashboardNavButton" class="nav-icon-button active" type="button" title="Dashboard" aria-label="Dashboard">
+            <span class="icon" aria-hidden="true">🏠</span>
+            <span class="nav-label">Dashboard</span>
+          </button>
+          <button id="discoNavButton" class="nav-icon-button" type="button" title="Disco" aria-label="Disco">
+            <span class="icon" aria-hidden="true">📊</span>
+            <span class="nav-label">Disco</span>
+          </button>
+          <button class="nav-icon-button" type="button" title="Dokumente" aria-label="Dokumente">
+            <span class="icon" aria-hidden="true">📁</span>
+            <span class="nav-label">Docs</span>
+          </button>
+          <button class="nav-icon-button" type="button" title="Journal" aria-label="Journal">
+            <span class="icon" aria-hidden="true">📝</span>
+            <span class="nav-label">Journal</span>
+          </button>
+        </div>
+
+        <div class="nav-icon-footer">
+          <button id="backIconButton" class="nav-icon-button" type="button" title="Zurück" aria-label="Zurück">
+            <span class="icon" aria-hidden="true">↩️</span>
+            <span class="nav-label">Zurück</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="detail-content">
+        <section id="notesDashboardArea" class="dashboard-area" aria-label="Projektfläche">
+          <div class="project-meta-row">
+            <p id="projectMeta" class="project-meta">&nbsp;</p>
+            <div class="dashboard-actions">
+              <button id="toggleHiddenNotesButton" class="button button-secondary compact icon-only" type="button" aria-label="Unsichtbare Notizen anzeigen" title="Unsichtbare Notizen anzeigen">
+                👁️
+              </button>
+              <button id="createNoteButton" class="button button-secondary compact" type="button">＋ Notiz</button>
+              <button id="createTitleNoteButton" class="button button-secondary compact" type="button">＋ Titel</button>
+            </div>
+          </div>
+          <div id="statusAlert" class="status-alert hidden" role="status" aria-live="polite"></div>
+          <div id="dashboardCanvas" class="dashboard-canvas" aria-label="Projekt-Fläche"></div>
+        </section>
+
+        <section id="discoArea" class="dashboard-area hidden" aria-label="Disco-Planung">
+          <div class="project-meta-row">
+            <p class="project-meta">Disco</p>
+            <button id="openDiscoLayerPickerButton" class="button button-secondary compact" type="button">+ Layer hinzufügen</button>
+          </div>
+          <div class="project-meta-row disco-week-row">
+            <button id="discoPreviousWeekButton" class="button button-secondary compact" type="button" aria-label="Vorherige Kalenderwoche">← KW zurück</button>
+            <p id="discoWeekLabel" class="project-meta">KW 00</p>
+            <button id="discoNextWeekButton" class="button button-secondary compact" type="button" aria-label="Nächste Kalenderwoche">KW vor →</button>
+          </div>
+          <div class="disco-open-tasks-panel">
+            <h4>Offene Aufgaben</h4>
+            <div id="discoOpenTasksList" class="disco-open-tasks-list" data-drop-zone="backlog">
+              <p class="subtle-text">Keine offenen Aufgaben.</p>
+            </div>
+          </div>
+          <div class="table-wrapper disco-table-wrapper">
+            <table class="disco-table">
+              <thead id="discoTableHead"></thead>
+              <tbody id="discoTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div id="noteModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="noteModalTitle">
+      <div class="modal-backdrop" data-close-note-modal="true"></div>
+      <div class="modal-panel">
+        <header class="modal-header">
+          <div>
+            <h3 id="noteModalTitle">Projekt-Notiz</h3>
+            <p class="subtle-text">Notiz-Flow mit Kommentaren und Anhängen.</p>
+          </div>
+          <button id="closeNoteModalButton" class="button button-secondary" type="button">Schliessen</button>
+        </header>
+
+        <form id="noteForm" class="note-form">
+          <label>
+            <span>Empfänger</span>
+            <select id="recipientUidInput"></select>
+          </label>
+          <label>
+            <span>Kategorie</span>
+            <select id="noteCategoryInput">
+              <option value="information">Information</option>
+              <option value="aufgabe">Aufgabe</option>
+            </select>
+          </label>
+          <label>
+            <span>Sichtbar ab</span>
+            <input id="visibleFromInput" type="date" />
+          </label>
+          <label class="full-width">
+            <span>Kommentar *</span>
+            <textarea id="noteTextInput" rows="5" required></textarea>
+          </label>
+          <label class="full-width">
+            <span>Attachments (PDF)</span>
+            <input id="noteAttachmentInput" type="file" accept="application/pdf,.pdf" multiple />
+          </label>
+
+          <div id="existingAttachments" class="existing-attachments full-width"></div>
+          <div class="flow-thread full-width">
+            <div class="flow-thread-title">Flow-Verlauf</div>
+            <div id="noteFlowList" class="flow-list">
+              <p class="subtle-text">Noch keine Kommentare vorhanden.</p>
+            </div>
+          </div>
+
+          <footer class="note-form-actions full-width">
+            <button id="deleteNoteButton" class="button button-danger hidden" type="button">Löschen</button>
+            <button class="button button-primary" type="submit">Speichern</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+
+    <div id="discoLayerModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="discoLayerModalTitle">
+      <div class="modal-backdrop" data-close-disco-layer-modal="true"></div>
+      <div class="modal-panel">
+        <header class="modal-header">
+          <div>
+            <h3 id="discoLayerModalTitle">Mitarbeiter als Layer hinzufügen</h3>
+            <p class="subtle-text">Wähle einen Mitarbeiter aus, um eine Zeile in der Disco-Matrix hinzuzufügen.</p>
+          </div>
+          <button id="closeDiscoLayerModalButton" class="button button-secondary" type="button">Schliessen</button>
+        </header>
+        <form id="discoLayerForm" class="note-form">
+          <label class="full-width">
+            <span>Mitarbeiter</span>
+            <select id="discoLayerProfileInput" required></select>
+          </label>
+          <footer class="note-form-actions full-width">
+            <div></div>
+            <button class="button button-primary" type="submit">Layer hinzufügen</button>
+          </footer>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>
