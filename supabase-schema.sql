@@ -85,6 +85,17 @@ create table if not exists public.request_history (
   context text not null
 );
 
+create table if not exists public.projects (
+  id uuid primary key default gen_random_uuid(),
+  commission_number text not null,
+  name text not null,
+  allow_expenses boolean not null default true,
+  project_lead_profile_id uuid references public.app_profiles(id) on delete set null,
+  construction_lead_profile_id uuid references public.app_profiles(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
 create table if not exists public.daily_assignments (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.app_profiles(id) on delete cascade,
