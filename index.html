@@ -76,6 +76,10 @@
               <span class="nav-tab-icon" aria-hidden="true">🧾</span>
               <span class="visually-hidden">CRM</span>
             </button>
+            <button class="nav-tab" data-page="properties" type="button" title="Immobilien" aria-label="Immobilien">
+              <span class="nav-tab-icon" aria-hidden="true">🏠</span>
+              <span class="visually-hidden">Immobilien</span>
+            </button>
             <button class="nav-tab" data-page="settings" type="button" title="Einstellungen" aria-label="Einstellungen">
               <span class="nav-tab-icon" aria-hidden="true">⚙️</span>
               <span class="visually-hidden">Einstellungen</span>
@@ -531,6 +535,81 @@
                     </table>
                   </div>
                 </article>
+              </div>
+            </div>
+          </section>
+
+          <section id="propertiesPage" class="page hidden">
+            <div class="panel table-panel">
+              <div class="section-heading">
+                <div>
+                  <h3>Immobilien</h3>
+                  <p>
+                    Immobilien pro CRM-Kontakt erfassen, Budget festhalten und Notizen inkl. Autor dokumentieren.
+                  </p>
+                </div>
+              </div>
+              <div id="propertiesAlert" class="alert hidden"></div>
+              <form id="propertyForm" class="settings-form">
+                <input id="propertyIdInput" type="hidden" />
+                <div class="properties-form-grid">
+                  <label>
+                    <span>CRM-Kontakt / Kunde *</span>
+                    <select id="propertyContactIdInput" required></select>
+                  </label>
+                  <label>
+                    <span>Name *</span>
+                    <input id="propertyNameInput" type="text" maxlength="180" required />
+                  </label>
+                  <label>
+                    <span>Adresse *</span>
+                    <input id="propertyAddressInput" type="text" maxlength="240" required />
+                  </label>
+                  <label>
+                    <span>Strasse *</span>
+                    <input id="propertyStreetInput" type="text" maxlength="180" required />
+                  </label>
+                  <label>
+                    <span>Postleitzahl *</span>
+                    <input id="propertyPostalCodeInput" type="text" maxlength="20" required />
+                  </label>
+                  <label>
+                    <span>Ort *</span>
+                    <input id="propertyCityInput" type="text" maxlength="120" required />
+                  </label>
+                  <label>
+                    <span>Budget (CHF) *</span>
+                    <input id="propertyBudgetInput" type="number" min="0" step="0.01" required />
+                  </label>
+                  <label>
+                    <span>Neues Dokument (JSON)</span>
+                    <textarea id="propertyDocumentInput" rows="3" placeholder='{"name":"mietvertrag.pdf","url":"/uploads/...","type":"application/pdf"}'></textarea>
+                  </label>
+                  <label>
+                    <span>Neue Notiz *</span>
+                    <textarea id="propertyNoteInput" rows="3" placeholder="Notiz erfassen (Autor wird automatisch gespeichert)."></textarea>
+                  </label>
+                </div>
+                <div class="modal-actions">
+                  <button id="savePropertyButton" class="button button-primary" type="submit">Immobilie speichern</button>
+                  <button id="resetPropertyFormButton" class="button button-secondary" type="button">Neu</button>
+                </div>
+              </form>
+              <div class="table-wrapper">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Kunde/Kontakt</th>
+                      <th>Adresse</th>
+                      <th>Budget</th>
+                      <th>Notizen</th>
+                      <th>Dokumente</th>
+                      <th>Aktion</th>
+                    </tr>
+                  </thead>
+                  <tbody id="propertiesTableBody"></tbody>
+                </table>
               </div>
             </div>
           </section>

@@ -375,6 +375,21 @@ create table if not exists public.crm_contacts (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.properties (
+  id uuid primary key default gen_random_uuid(),
+  contact_id uuid not null references public.crm_contacts(id) on delete cascade,
+  name text not null,
+  adresse text not null,
+  strasse text not null,
+  postleitzahl text not null,
+  ort text not null,
+  budget numeric(12,2) not null check (budget > 0),
+  notizen jsonb not null default '[]'::jsonb,
+  dokumente jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
 do $$
 begin
   if to_regclass('public.notes') is null and to_regclass('public.crm_notes') is not null then
@@ -530,6 +545,7 @@ for each row execute function public.set_updated_at();
 
 alter table public.projects enable row level security;
 alter table public.crm_contacts enable row level security;
+alter table public.properties enable row level security;
 alter table public.notes enable row level security;
 alter table public.school_vacations enable row level security;
 alter table public.project_disco_layers enable row level security;
@@ -546,6 +562,14 @@ with check (public.is_admin_user());
 drop policy if exists "crm_contacts admin access" on public.crm_contacts;
 create policy "crm_contacts admin access"
 on public.crm_contacts
+for all
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
+drop policy if exists "properties admin access" on public.properties;
+create policy "properties admin access"
+on public.properties
 for all
 to authenticated
 using (public.is_admin_user())
@@ -648,6 +672,7 @@ create index if not exists holiday_requests_profile_dates_idx on public.holiday_
 create index if not exists request_history_profile_created_at_idx on public.request_history (profile_id, created_at desc);
 create index if not exists daily_assignments_profile_date_idx on public.daily_assignments (profile_id, assignment_date);
 create index if not exists crm_contacts_last_name_idx on public.crm_contacts (last_name, first_name);
+create index if not exists properties_contact_created_idx on public.properties (contact_id, created_at desc);
 create index if not exists notes_target_uid_created_at_idx on public.notes (target_uid, created_at desc);
 create index if not exists project_disco_layers_project_week_idx on public.project_disco_layers (project_id, week_start_date, sort_order);
 create index if not exists project_disco_entries_project_note_idx on public.project_disco_entries (project_id, note_id);
@@ -679,6 +704,12 @@ execute function public.set_updated_at();
 drop trigger if exists set_updated_at_crm_contacts on public.crm_contacts;
 create trigger set_updated_at_crm_contacts
 before update on public.crm_contacts
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists set_updated_at_properties on public.properties;
+create trigger set_updated_at_properties
+before update on public.properties
 for each row
 execute function public.set_updated_at();
 

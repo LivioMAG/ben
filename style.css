@@ -447,6 +447,18 @@ textarea:focus {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.properties-form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.properties-form-grid label:last-child,
+.properties-form-grid label:nth-last-child(2) {
+  grid-column: span 3;
+}
+
 .crm-notes-card {
   margin-top: 20px;
   padding: 20px;
@@ -952,6 +964,10 @@ tbody tr:hover {
   }
 
   .crm-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .properties-form-grid {
     grid-template-columns: 1fr;
   }
 
