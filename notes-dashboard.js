@@ -2,12 +2,11 @@
   const DASHBOARD_TABLE = 'dashboard_notes';
   const ATTACHMENTS_TABLE = 'dashboard_note_attachments';
   const STORAGE_BUCKET = 'dashboard-note-attachments';
-  const GRID_SIZE = 24;
-  const DEFAULT_NOTE_WIDTH = 168;
-  const DEFAULT_NOTE_HEIGHT = 120;
+  const GRID_SIZE = 8;
+  const DEFAULT_NOTE_WIDTH = 92;
+  const DEFAULT_NOTE_HEIGHT = 68;
   const CARD_PREVIEW_MAX_LENGTH = 80;
   const LONG_PRESS_DELAY_MS = 520;
-  const LONG_HOVER_DELAY_MS = 3000;
   const DRAG_START_THRESHOLD_PX = 6;
 
   class NotesDashboard {
@@ -30,7 +29,6 @@
       this.pressState = null;
       this.isSaving = false;
       this.editingNoteId = null;
-      this.hoverState = null;
       this.expandedNoteId = null;
       this.inlineSaveTimer = null;
       this.boundResize = this.handleViewportResize.bind(this);
@@ -59,8 +57,6 @@
       this.canvas.addEventListener('dblclick', (event) => this.handleCanvasDoubleClick(event));
       this.canvas.addEventListener('pointerdown', (event) => this.handleCanvasPointerDown(event));
       this.canvas.addEventListener('dblclick', (event) => this.handleNoteDoubleClick(event));
-      this.canvas.addEventListener('pointerover', (event) => this.handleCanvasPointerOver(event));
-      this.canvas.addEventListener('pointerout', (event) => this.handleCanvasPointerOut(event));
       this.canvas.addEventListener('input', (event) => this.handleInlineEditorInput(event));
       this.canvas.addEventListener('focusout', (event) => this.handleInlineEditorFocusOut(event));
 
@@ -85,7 +81,7 @@
     destroy() {
       window.removeEventListener('resize', this.boundResize);
       this.clearPressState();
-      this.clearHoverState();
+      this.expandedNoteId = null;
       if (this.inlineSaveTimer) {
         window.clearTimeout(this.inlineSaveTimer);
         this.inlineSaveTimer = null;
@@ -132,7 +128,7 @@
       this.activeNoteId = null;
       this.dragState = null;
       this.clearPressState();
-      this.clearHoverState();
+      this.expandedNoteId = null;
       this.render();
       this.hideActionBar();
       this.closeModal();
@@ -204,7 +200,6 @@
       this.pressState.timerId = window.setTimeout(() => this.handleLongPress(event.pointerId), LONG_PRESS_DELAY_MS);
       note.setPointerCapture(event.pointerId);
       this.bindDragListeners();
-      this.render();
     }
 
     handleNoteDoubleClick(event) {
@@ -387,44 +382,6 @@
       this.modal.classList.add('hidden');
     }
 
-    handleCanvasPointerOver(event) {
-      const note = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note') : null;
-      if (!note || event.pointerType === 'touch') return;
-      const related = event.relatedTarget instanceof HTMLElement ? event.relatedTarget.closest('.dashboard-note') : null;
-      if (related && related.dataset.noteId === note.dataset.noteId) return;
-      const noteId = note.dataset.noteId;
-      if (!noteId) return;
-      this.clearHoverState();
-      this.hoverState = { noteId };
-      this.hoverState.timerId = window.setTimeout(() => {
-        if (!this.hoverState || String(this.hoverState.noteId) !== String(noteId)) return;
-        this.expandedNoteId = noteId;
-        this.render();
-      }, LONG_HOVER_DELAY_MS);
-    }
-
-    handleCanvasPointerOut(event) {
-      const sourceNote = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note') : null;
-      if (!sourceNote) return;
-      const related = event.relatedTarget instanceof HTMLElement ? event.relatedTarget.closest('.dashboard-note') : null;
-      if (related && related.dataset.noteId === sourceNote.dataset.noteId) return;
-      const noteId = sourceNote.dataset.noteId;
-      if (this.hoverState && String(this.hoverState.noteId) === String(noteId)) {
-        this.clearHoverState();
-      }
-      if (String(this.expandedNoteId) === String(noteId)) {
-        this.expandedNoteId = null;
-        this.render();
-      }
-    }
-
-    clearHoverState() {
-      if (this.hoverState?.timerId) {
-        window.clearTimeout(this.hoverState.timerId);
-      }
-      this.hoverState = null;
-    }
-
     getActiveNote() {
       return this.notes.find((entry) => String(entry.id) === String(this.activeNoteId));
     }
@@ -569,8 +526,8 @@
 
     normalizePosition({ posX, posY, width, height }) {
       const bounds = this.canvas?.getBoundingClientRect();
-      const maxWidth = Math.max(140, Math.min(width || DEFAULT_NOTE_WIDTH, (bounds?.width || 240) - 12));
-      const maxHeight = Math.max(96, Math.min(height || DEFAULT_NOTE_HEIGHT, (bounds?.height || 180) - 12));
+      const maxWidth = Math.max(72, Math.min(width || DEFAULT_NOTE_WIDTH, (bounds?.width || 240) - 12));
+      const maxHeight = Math.max(52, Math.min(height || DEFAULT_NOTE_HEIGHT, (bounds?.height || 180) - 12));
       const maxX = Math.max(0, (bounds?.width || maxWidth) - maxWidth - 8);
       const maxY = Math.max(0, (bounds?.height || maxHeight) - maxHeight - 8);
       return {
@@ -611,6 +568,7 @@
       }
       this.activeNoteId = null;
       this.editingNoteId = null;
+      this.expandedNoteId = null;
       this.hideActionBar();
       this.render();
     }
@@ -680,6 +638,7 @@
     startInlineEditing(noteId) {
       this.activeNoteId = noteId;
       this.editingNoteId = noteId;
+      this.expandedNoteId = noteId;
       this.hideActionBar();
       this.render();
     }
@@ -703,6 +662,9 @@
       if (!noteId) return;
       this.persistInlineSave(noteId).catch((error) => this.reportError('Notiz konnte nicht gespeichert werden.', error));
       this.editingNoteId = null;
+      if (String(this.expandedNoteId) === String(noteId)) {
+        this.expandedNoteId = null;
+      }
       this.render();
     }
 
