@@ -20,6 +20,7 @@ const state = {
   draggedNoteId: null,
   pendingCreateColumn: null,
   activeAttachmentNoteId: null,
+  activeCounterHistoryNoteId: null,
   pendingFocus: null,
 };
 
@@ -67,6 +68,10 @@ function cacheElements() {
   elements.documentsModalBackdrop = document.getElementById('documentsModalBackdrop');
   elements.closeDocumentsModalButton = document.getElementById('closeDocumentsModalButton');
   elements.documentsOverviewList = document.getElementById('documentsOverviewList');
+  elements.counterHistoryModal = document.getElementById('counterHistoryModal');
+  elements.counterHistoryModalBackdrop = document.getElementById('counterHistoryModalBackdrop');
+  elements.closeCounterHistoryModalButton = document.getElementById('closeCounterHistoryModalButton');
+  elements.counterHistoryModalContent = document.getElementById('counterHistoryModalContent');
 }
 
 function bindEvents() {
@@ -96,6 +101,8 @@ function bindEvents() {
   elements.openDocumentsButton?.addEventListener('click', openDocumentsModal);
   elements.closeDocumentsModalButton?.addEventListener('click', closeDocumentsModal);
   elements.documentsModalBackdrop?.addEventListener('click', closeDocumentsModal);
+  elements.closeCounterHistoryModalButton?.addEventListener('click', closeCounterHistoryModal);
+  elements.counterHistoryModalBackdrop?.addEventListener('click', closeCounterHistoryModal);
 }
 
 async function initializeSupabase() {
@@ -131,6 +138,9 @@ function render() {
   if (!elements.documentsModal?.classList.contains('hidden')) {
     renderDocumentsOverview();
   }
+  if (!elements.counterHistoryModal?.classList.contains('hidden')) {
+    renderCounterHistoryModal();
+  }
   restorePendingFocus();
 }
 
@@ -163,13 +173,13 @@ function renderPreviewCard(note, columnKey) {
   const todoMarkup = noteType === 'todo' ? renderTodoPreview(note) : '';
   const counterMarkup = noteType === 'counter' ? renderCounterPreview(note) : '';
   const textMarkup = noteType === 'text'
-    ? `<textarea class="note-preview-text inline-note-text" data-field="content-inline" data-note-id="${escapeAttribute(note.id)}" rows="3" aria-label="Notiztext">${escapeHtml(note.content || '')}</textarea>`
+    ? `<textarea class="note-preview-text inline-note-text" data-field="content-inline" data-note-id="${escapeAttribute(note.id)}" rows="3" aria-label="Notiztext" placeholder="Notiz hier eingeben ...">${escapeHtml(note.content || '')}</textarea>`
     : '';
   const todoDescription = noteType === 'todo'
-    ? `<input type="text" class="todo-description-input" data-field="todo-description-inline" data-note-id="${escapeAttribute(note.id)}" value="${escapeAttribute(note.todo_description || '')}" placeholder="To-do Beschreibung" />`
+    ? `<input type="text" class="todo-description-input" data-field="todo-description-inline" data-note-id="${escapeAttribute(note.id)}" value="${escapeAttribute(note.todo_description || '')}" placeholder="To-do Beschreibung ..." />`
     : '';
   const counterDescription = noteType === 'counter'
-    ? `<input type="text" class="counter-description-input" data-field="counter-description-inline" data-note-id="${escapeAttribute(note.id)}" value="${escapeAttribute(note.counter_description || '')}" placeholder="Counter Beschreibung" />`
+    ? `<input type="text" class="counter-description-input" data-field="counter-description-inline" data-note-id="${escapeAttribute(note.id)}" value="${escapeAttribute(note.counter_description || '')}" placeholder="Counter Beschreibung ..." />`
     : '';
   const metaUser = note.created_by_name || getCurrentUserName();
   const metaTime = formatTimestamp(note.updated_at || note.created_at);
@@ -249,15 +259,23 @@ function handleBoardClick(event) {
   }
   if (action === 'confirm-counter-plus' && noteId) {
     incrementCounter(noteId);
+    return;
+  }
+  if (action === 'open-counter-history' && noteId) {
+    openCounterHistoryModal(noteId);
   }
 }
 
 function renderTodoPreview(note) {
   const items = normalizeTodoItems(note.todo_items);
+  const sortedItems = [
+    ...items.filter((item) => !item.done),
+    ...items.filter((item) => item.done),
+  ];
   const list = items.length
     ? `
       <ul class="todo-list compact">
-        ${items.map((item, index) => `
+        ${sortedItems.map((item, index) => `
           <li class="todo-item ${item.done ? 'done' : ''}">
             <input type="checkbox" data-action="toggle-todo" data-note-id="${escapeAttribute(note.id)}" data-index="${index}" ${item.done ? 'checked' : ''} />
             <input
@@ -288,11 +306,26 @@ function renderCounterPreview(note) {
   const percent = Math.min(100, Math.round((value / target) * 100));
   return `
     <div class="counter-main">${escapeHtml(String(value))} / ${escapeHtml(String(target))}</div>
+      <div class="counter-target-inline">
+        <label for="counter-target-${escapeAttribute(note.id)}">Ziel:</label>
+        <input
+          id="counter-target-${escapeAttribute(note.id)}"
+          type="number"
+          min="1"
+          step="1"
+          data-field="counter-target-inline"
+          data-note-id="${escapeAttribute(note.id)}"
+          value="${escapeAttribute(String(target))}"
+          aria-label="Counter Zielwert"
+        />
+      </div>
       <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, Math.round((value / target) * 100))}">
         <div class="preview-progress-fill" style="width:${percent}%;"></div>
       </div>
-      <button type="button" class="button-primary counter-plus" data-action="confirm-counter-plus" data-note-id="${escapeAttribute(note.id)}">Bestätigen</button>
-      ${renderCounterLog(note)}
+      <div class="counter-actions">
+        <button type="button" class="button-primary counter-plus" data-action="confirm-counter-plus" data-note-id="${escapeAttribute(note.id)}">Bestätigen</button>
+        <button type="button" class="button-secondary counter-history-open" data-action="open-counter-history" data-note-id="${escapeAttribute(note.id)}">History</button>
+      </div>
   `;
 }
 
@@ -347,7 +380,7 @@ function renderAttachmentModal() {
   const attachments = normalizeAttachments(note.attachments);
   elements.attachmentModalContent.innerHTML = `
     <div class="attachments-header">
-      <label class="button-secondary upload-button">➕ Datei hinzufügen
+      <label class="upload-link">＋ Datei hinzufügen
         <input type="file" data-action="upload-attachment-modal" data-note-id="${escapeAttribute(note.id)}" accept="${escapeAttribute(DOCUMENT_ACCEPT)}" />
       </label>
     </div>
@@ -357,14 +390,32 @@ function renderAttachmentModal() {
   `;
 }
 
-function renderCounterLog(note) {
-  const rows = normalizeCounterLog(note.counter_log).slice(0, 5);
-  if (!rows.length) return '<p class="note-preview-meta">Noch keine Bestätigungen.</p>';
-  return `
-    <ul class="counter-log minimal">
-      ${rows.map((entry) => `<li>${escapeHtml(entry.actor_name || 'Unbekannt')} · ${escapeHtml(formatTimestamp(entry.timestamp))}</li>`).join('')}
-    </ul>
-  `;
+function openCounterHistoryModal(noteId) {
+  state.activeCounterHistoryNoteId = noteId;
+  elements.counterHistoryModal?.classList.remove('hidden');
+  renderCounterHistoryModal();
+}
+
+function closeCounterHistoryModal() {
+  state.activeCounterHistoryNoteId = null;
+  elements.counterHistoryModal?.classList.add('hidden');
+}
+
+function renderCounterHistoryModal() {
+  if (!elements.counterHistoryModalContent) return;
+  const note = state.notes.find((entry) => String(entry.id) === String(state.activeCounterHistoryNoteId));
+  if (!note) {
+    elements.counterHistoryModalContent.innerHTML = '<p class="modal-empty">Counter nicht gefunden.</p>';
+    return;
+  }
+  const rows = normalizeCounterLog(note.counter_log);
+  elements.counterHistoryModalContent.innerHTML = rows.length
+    ? `
+      <ul class="counter-history-list">
+        ${rows.map((entry) => `<li><strong>${escapeHtml(entry.actor_name || 'Unbekannt')}</strong><span>${escapeHtml(formatTimestamp(entry.timestamp))}</span></li>`).join('')}
+      </ul>
+    `
+    : '<p class="modal-empty">Noch keine Bestätigungen.</p>';
 }
 
 function renderAttachmentCard(note, attachment, index) {
@@ -438,16 +489,16 @@ async function createNote(columnKey, noteType = 'text') {
   };
 
   if (noteType === 'text') {
-    basePayload.content = 'Neue Notiz';
+    basePayload.content = '';
   }
 
   if (noteType === 'todo') {
-    basePayload.todo_description = 'Neue To-do-Liste';
-    basePayload.todo_items = [{ text: '', done: false, done_by_uid: null, done_by_name: null, done_at: null }];
+    basePayload.todo_description = '';
+    basePayload.todo_items = [];
   }
 
   if (noteType === 'counter') {
-    basePayload.counter_description = 'Neuer Counter';
+    basePayload.counter_description = '';
     basePayload.counter_start_value = 1;
     basePayload.counter_value = 0;
   }
@@ -469,7 +520,11 @@ async function toggleTodoItem(noteId, index, isChecked) {
   items[index].done_by_uid = isChecked ? getCurrentUserUid() : null;
   items[index].done_by_name = isChecked ? getCurrentUserName() : null;
   items[index].done_at = isChecked ? new Date().toISOString() : null;
-  const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: items }).eq('id', noteId);
+  const sortedItems = [
+    ...items.filter((item) => !item.done),
+    ...items.filter((item) => item.done),
+  ];
+  const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: sortedItems }).eq('id', noteId);
   if (error) {
     showAlert(`To-do konnte nicht aktualisiert werden: ${error.message}`, true);
     return;
@@ -497,6 +552,9 @@ async function handleBoardChange(event) {
   }
   if (field === 'counter-description-inline') {
     await saveCounterDescription(noteId, event.target.value);
+  }
+  if (field === 'counter-target-inline') {
+    await saveCounterTarget(noteId, event.target.value);
   }
   if (field === 'todo-item-inline') {
     const index = Number(event.target.dataset.index);
@@ -527,10 +585,6 @@ async function saveTextNote(noteId, directValue = null) {
     title: '',
     content: String((directValue ?? contentInput?.value) || '').trim(),
   };
-  if (!payload.content) {
-    showAlert('Notiz darf nicht leer sein.', true);
-    return;
-  }
   const { error } = await state.supabase.from(KANBAN_TABLE).update(payload).eq('id', noteId);
   if (error) {
     showAlert(`Notiz konnte nicht gespeichert werden: ${error.message}`, true);
@@ -552,10 +606,19 @@ async function saveTodoDescription(noteId, value) {
 
 async function saveCounterDescription(noteId, value) {
   const counter_description = String(value || '').trim();
-  if (!counter_description) return;
   const { error } = await state.supabase.from(KANBAN_TABLE).update({ counter_description, title: '' }).eq('id', noteId);
   if (error) {
     showAlert(`Counter konnte nicht gespeichert werden: ${error.message}`, true);
+    return;
+  }
+  await loadData();
+}
+
+async function saveCounterTarget(noteId, value) {
+  const counter_start_value = Math.max(1, Number.parseInt(String(value || '1'), 10) || 1);
+  const { error } = await state.supabase.from(KANBAN_TABLE).update({ counter_start_value }).eq('id', noteId);
+  if (error) {
+    showAlert(`Counter-Ziel konnte nicht gespeichert werden: ${error.message}`, true);
     return;
   }
   await loadData();
