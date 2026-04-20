@@ -54,7 +54,7 @@
       this.canvas.addEventListener('dblclick', (event) => this.handleNoteDoubleClick(event));
 
       if (this.modalTextarea) {
-        this.modalTextarea.addEventListener('input', () => this.renderModal());
+        this.modalTextarea.addEventListener('input', () => this.handleModalInput());
       }
       if (this.modalSaveButton) {
         this.modalSaveButton.addEventListener('click', () => this.saveActiveNoteFromModal());
@@ -343,6 +343,13 @@
           }).join('');
         }
       }
+    }
+
+    handleModalInput() {
+      const activeNote = this.getActiveNote();
+      if (!activeNote || !this.modalTextarea) return;
+      activeNote.content = String(this.modalTextarea.value || '');
+      this.render();
     }
 
     async saveActiveNoteFromModal() {
