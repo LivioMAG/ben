@@ -550,51 +550,15 @@
                 </div>
               </div>
               <div id="propertiesAlert" class="alert hidden"></div>
-              <form id="propertyForm" class="settings-form">
-                <input id="propertyIdInput" type="hidden" />
-                <div class="properties-form-grid">
-                  <label>
-                    <span>CRM-Kontakt / Kunde *</span>
-                    <select id="propertyContactIdInput" required></select>
-                  </label>
-                  <label>
-                    <span>Name *</span>
-                    <input id="propertyNameInput" type="text" maxlength="180" required />
-                  </label>
-                  <label>
-                    <span>Strasse *</span>
-                    <input id="propertyStreetInput" type="text" maxlength="180" required />
-                  </label>
-                  <label>
-                    <span>Postleitzahl *</span>
-                    <input id="propertyPostalCodeInput" type="text" maxlength="20" required />
-                  </label>
-                  <label>
-                    <span>Ort *</span>
-                    <input id="propertyCityInput" type="text" maxlength="120" required />
-                  </label>
-                  <label>
-                    <span>Budget (CHF) *</span>
-                    <input id="propertyBudgetInput" type="number" min="0" step="0.01" required />
-                  </label>
-                  <label>
-                    <span>Dokumente hochladen</span>
-                    <input id="propertyDocumentFileInput" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple />
-                  </label>
-                  <div id="propertyDocumentsPreview" class="property-documents-preview subtle-text">
-                    Noch keine Dokumente vorhanden.
+              <div id="propertiesListView">
+                <div class="section-heading compact">
+                  <div>
+                    <h4>Objektliste</h4>
+                    <p>Neue Immobilien werden über ein Pop-up erfasst. Notizen und Dokumente erfolgen im Detail.</p>
                   </div>
-                  <label>
-                    <span>Neue Notiz *</span>
-                    <textarea id="propertyNoteInput" rows="3" placeholder="Notiz erfassen (Autor wird automatisch gespeichert)."></textarea>
-                  </label>
+                  <button id="openPropertyModalButton" class="button button-primary" type="button">Immobilie erfassen</button>
                 </div>
-                <div class="modal-actions">
-                  <button id="savePropertyButton" class="button button-primary" type="submit">Immobilie speichern</button>
-                  <button id="resetPropertyFormButton" class="button button-secondary" type="button">Neu</button>
-                </div>
-              </form>
-              <div class="table-wrapper">
+                <div class="table-wrapper">
                 <table>
                   <thead>
                     <tr>
@@ -609,11 +573,99 @@
                   </thead>
                   <tbody id="propertiesTableBody"></tbody>
                 </table>
+                </div>
+              </div>
+
+              <div id="propertyDetailView" class="hidden">
+                <div class="section-heading compact">
+                  <div>
+                    <h4 id="propertyDetailTitle">Immobilie</h4>
+                    <p>Klicke auf «Bearbeiten», um Stammdaten anzupassen.</p>
+                  </div>
+                  <div class="table-actions">
+                    <button id="editPropertyFromDetailButton" class="button button-secondary" type="button">Bearbeiten</button>
+                    <button id="backToPropertiesListButton" class="button button-ghost" type="button">Zurück zur Liste</button>
+                  </div>
+                </div>
+                <div class="property-detail-layout">
+                  <div class="panel property-detail-left">
+                    <h5>Informationen</h5>
+                    <div id="propertyDetailInfo" class="property-detail-info"></div>
+                    <div class="property-detail-section">
+                      <h5>Dokumente</h5>
+                      <form id="propertyDocumentForm" class="settings-form compact">
+                        <label>
+                          <span>Neue Dokumente</span>
+                          <input id="propertyDetailDocumentFileInput" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple />
+                        </label>
+                        <button class="button button-secondary" type="submit">Dokumente hochladen</button>
+                      </form>
+                      <div id="propertyDetailDocumentsList" class="property-documents-preview subtle-text">Noch keine Dokumente vorhanden.</div>
+                    </div>
+                  </div>
+                  <div class="panel property-detail-right">
+                    <h5>Notizen</h5>
+                    <form id="propertyDetailNoteForm" class="settings-form compact">
+                      <label>
+                        <span>Neue Notiz</span>
+                        <textarea id="propertyDetailNoteInput" rows="3" placeholder="Notiz zur Immobilie erfassen"></textarea>
+                      </label>
+                      <button class="button button-secondary" type="submit">Notiz hinzufügen</button>
+                    </form>
+                    <ul id="propertyDetailNotesList" class="crm-notes-list"></ul>
+                  </div>
+                </div>
               </div>
             </div>
           </section>
         </main>
       </section>
+
+      <div id="propertyModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="propertyModalTitle">
+        <div class="modal-backdrop" data-close-property-modal="true"></div>
+        <div class="modal-card panel">
+          <div class="section-heading compact">
+            <div>
+              <h3 id="propertyModalTitle">Immobilie erfassen</h3>
+              <p>Nur Stammdaten erfassen. Notizen und Dokumente werden danach im Detail gepflegt.</p>
+            </div>
+            <button id="closePropertyModalButton" class="button button-ghost" type="button">Schliessen</button>
+          </div>
+          <form id="propertyForm" class="settings-form">
+            <input id="propertyIdInput" type="hidden" />
+            <div class="properties-form-grid">
+              <label>
+                <span>CRM-Kontakt / Kunde *</span>
+                <select id="propertyContactIdInput" required></select>
+              </label>
+              <label>
+                <span>Name *</span>
+                <input id="propertyNameInput" type="text" maxlength="180" required />
+              </label>
+              <label>
+                <span>Strasse *</span>
+                <input id="propertyStreetInput" type="text" maxlength="180" required />
+              </label>
+              <label>
+                <span>Postleitzahl *</span>
+                <input id="propertyPostalCodeInput" type="text" maxlength="20" required />
+              </label>
+              <label>
+                <span>Ort *</span>
+                <input id="propertyCityInput" type="text" maxlength="120" required />
+              </label>
+              <label>
+                <span>Budget (CHF) *</span>
+                <input id="propertyBudgetInput" type="number" min="0" step="0.01" required />
+              </label>
+            </div>
+            <div class="modal-actions">
+              <button id="savePropertyButton" class="button button-primary" type="submit">Immobilie speichern</button>
+              <button id="resetPropertyFormButton" class="button button-secondary" type="button">Neu</button>
+            </div>
+          </form>
+        </div>
+      </div>
 
       <section id="accessDeniedView" class="login-view view hidden">
         <div class="login-card panel access-denied-card">
