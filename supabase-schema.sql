@@ -391,6 +391,16 @@ create table if not exists public.properties (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.material_entries (
+  id uuid primary key default gen_random_uuid(),
+  kommissionsnummer text not null,
+  betrag numeric(12,2) not null check (betrag > 0),
+  beleg_url text not null,
+  beleg_name text,
+  beschreibung text,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
 alter table if exists public.properties
   drop column if exists adresse;
 
@@ -593,6 +603,7 @@ for each row execute function public.set_updated_at();
 alter table public.projects enable row level security;
 alter table public.crm_contacts enable row level security;
 alter table public.properties enable row level security;
+alter table public.material_entries enable row level security;
 alter table public.notes enable row level security;
 alter table public.school_vacations enable row level security;
 alter table public.project_kanban_notes enable row level security;
@@ -616,6 +627,14 @@ with check (public.is_admin_user());
 drop policy if exists "properties admin access" on public.properties;
 create policy "properties admin access"
 on public.properties
+for all
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
+drop policy if exists "material_entries admin access" on public.material_entries;
+create policy "material_entries admin access"
+on public.material_entries
 for all
 to authenticated
 using (public.is_admin_user())
@@ -831,6 +850,10 @@ insert into storage.buckets (id, name, public)
 values ('project-kanban-attachments', 'project-kanban-attachments', true)
 on conflict (id) do nothing;
 
+insert into storage.buckets (id, name, public)
+values ('material-belege', 'material-belege', true)
+on conflict (id) do nothing;
+
 drop policy if exists "weekly attachment read own or master" on storage.objects;
 drop policy if exists "weekly attachment write own or master" on storage.objects;
 drop policy if exists "authenticated attachment read" on storage.objects;
@@ -841,6 +864,8 @@ drop policy if exists "crm note attachment read own or admin" on storage.objects
 drop policy if exists "crm note attachment write own or admin" on storage.objects;
 drop policy if exists "project kanban attachment read own or admin" on storage.objects;
 drop policy if exists "project kanban attachment write own or admin" on storage.objects;
+drop policy if exists "material attachment read own or admin" on storage.objects;
+drop policy if exists "material attachment write own or admin" on storage.objects;
 
 create policy "weekly attachment read own or admin"
 on storage.objects
@@ -927,4 +952,24 @@ with check (
     public.is_admin_user()
     or auth.uid()::text = split_part(name, '/', 1)
   )
+);
+
+create policy "material attachment read own or admin"
+on storage.objects
+for select
+using (
+  bucket_id = 'material-belege'
+  and public.is_admin_user()
+);
+
+create policy "material attachment write own or admin"
+on storage.objects
+for all
+using (
+  bucket_id = 'material-belege'
+  and public.is_admin_user()
+)
+with check (
+  bucket_id = 'material-belege'
+  and public.is_admin_user()
 );
