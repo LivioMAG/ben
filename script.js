@@ -627,6 +627,8 @@ const state = {
   crmNotes: [],
   properties: [],
   materialEntries: [],
+  weeklyReportHistory: [],
+  upcomingDailyAssignments: [],
   selectedCrmContactId: null,
   selectedPropertyId: null,
   crmSearchQuery: '',
@@ -1419,6 +1421,9 @@ function resetAppState() {
   state.crmContacts = [];
   state.crmNotes = [];
   state.properties = [];
+  state.materialEntries = [];
+  state.weeklyReportHistory = [];
+  state.upcomingDailyAssignments = [];
   state.selectedCrmContactId = null;
   state.employeeFilterQuery = '';
   state.projectSearchQuery = '';
@@ -1508,6 +1513,8 @@ async function loadData() {
       state.crmNotes = [];
       state.properties = [];
       state.materialEntries = [];
+      state.weeklyReportHistory = [];
+      state.upcomingDailyAssignments = [];
       state.selectedCrmContactId = null;
       elements.dataTimestamp.textContent = 'Kein Zugriff – is_admin ist für dieses Profil nicht aktiviert';
       finishDataLoad(requestId);
@@ -1579,6 +1586,17 @@ async function loadData() {
       .from('material_entries')
       .select('*')
       .order('created_at', { ascending: false });
+    const weeklyReportHistoryQuery = state.supabase
+      .from('weekly_reports')
+      .select('work_date, commission_number')
+      .order('work_date', { ascending: false })
+      .limit(20000);
+    const upcomingDailyAssignmentsQuery = state.supabase
+      .from('daily_assignments')
+      .select('assignment_date, project_id, label')
+      .gte('assignment_date', new Date().toISOString().slice(0, 10))
+      .order('assignment_date', { ascending: true })
+      .limit(20000);
     const [
       { data: reports, error: reportsError },
       { data: profiles, error: profilesError },
@@ -1592,6 +1610,8 @@ async function loadData() {
       { data: crmNotes, error: crmNotesError },
       { data: properties, error: propertiesError },
       { data: materialEntries, error: materialEntriesError },
+      { data: weeklyReportHistory, error: weeklyReportHistoryError },
+      { data: upcomingDailyAssignments, error: upcomingDailyAssignmentsError },
     ] = await Promise.all([
       reportsQuery,
       profilesQuery,
@@ -1605,6 +1625,8 @@ async function loadData() {
       crmNotesQuery,
       propertiesQuery,
       materialEntriesQuery,
+      weeklyReportHistoryQuery,
+      upcomingDailyAssignmentsQuery,
     ]);
 
     if (reportsError) throw reportsError;
@@ -1619,6 +1641,8 @@ async function loadData() {
     if (crmNotesError && !isMissingTableError(crmNotesError, NOTES_TABLE)) throw crmNotesError;
     if (propertiesError && !isMissingTableError(propertiesError, PROPERTIES_TABLE)) throw propertiesError;
     if (materialEntriesError && !isMissingTableError(materialEntriesError, 'material_entries')) throw materialEntriesError;
+    if (weeklyReportHistoryError) throw weeklyReportHistoryError;
+    if (upcomingDailyAssignmentsError && !isMissingTableError(upcomingDailyAssignmentsError, 'daily_assignments')) throw upcomingDailyAssignmentsError;
     if (!isActiveDataLoad(requestId)) {
       return;
     }
@@ -1635,6 +1659,8 @@ async function loadData() {
     state.crmNotes = crmNotes ?? [];
     state.properties = properties ?? [];
     state.materialEntries = materialEntries ?? [];
+    state.weeklyReportHistory = weeklyReportHistory ?? [];
+    state.upcomingDailyAssignments = upcomingDailyAssignments ?? [];
     if (state.selectedCrmContactId && !state.crmContacts.some((item) => String(item.id) === String(state.selectedCrmContactId))) {
       state.selectedCrmContactId = null;
     }
@@ -1707,6 +1733,9 @@ async function loadDemoData() {
     state.requestHistory = [];
     state.platformHolidays = [];
     state.schoolVacations = [];
+    state.materialEntries = [];
+    state.weeklyReportHistory = [];
+    state.upcomingDailyAssignments = [];
     elements.dataTimestamp.textContent = 'Kein Zugriff – Demo-Profil hat is_admin = false';
     return;
   }
@@ -1734,6 +1763,9 @@ async function loadDemoData() {
   state.crmContacts = [];
   state.crmNotes = [];
   state.properties = [];
+  state.materialEntries = [];
+  state.weeklyReportHistory = [...demoWeeklyReports];
+  state.upcomingDailyAssignments = [];
   state.selectedCrmContactId = null;
   syncEmployeeSelection();
   syncAbsenceSelection();
@@ -4956,11 +4988,11 @@ function renderProjectsTable() {
     return;
   }
   elements.projectsTableBody.innerHTML = rows.map((project) => {
-    const terminated = project.terminated_at || project.is_terminated ? 'Ja' : 'Nein';
+    const scheduleStatus = getProjectScheduleStatus(project);
     return `<tr class="project-row-clickable" data-action="open-project-detail" data-project-id="${escapeAttribute(project.id)}">
       <td>${escapeHtml(project.name || '—')}</td>
       <td>${escapeHtml(project.commission_number || '')}</td>
-      <td>${escapeHtml(terminated)}</td>
+      <td>${renderProjectScheduleCell(scheduleStatus)}</td>
       <td><span class="pill ${project.allow_expenses === false ? 'warning' : 'success'}">${project.allow_expenses === false ? 'Nein' : 'Ja'}</span></td>
       <td>
         <div class="table-row-actions">
@@ -4970,6 +5002,75 @@ function renderProjectsTable() {
       </td>
     </tr>`;
   }).join('');
+}
+
+function renderProjectScheduleCell(scheduleStatus = {}) {
+  const lastAssignmentLabel = scheduleStatus.lastAssignmentDate ? formatDate(scheduleStatus.lastAssignmentDate) : '—';
+  const nextAssignmentLabel = scheduleStatus.nextAssignmentDate ? formatDate(scheduleStatus.nextAssignmentDate) : '—';
+  return `
+    <div class="status-stack compact">
+      <span><strong>Letzter Einsatz:</strong> ${escapeHtml(lastAssignmentLabel)}</span>
+      <span><strong>Geplanter Einsatz:</strong> ${escapeHtml(nextAssignmentLabel)}</span>
+    </div>
+  `;
+}
+
+function getProjectScheduleStatus(project) {
+  const commissionNumber = String(project?.commission_number || '').trim();
+  const projectId = String(project?.id || '');
+  if (!commissionNumber || !projectId) {
+    return { lastAssignmentDate: '', nextAssignmentDate: '' };
+  }
+  const lastAssignmentDate = getLastAssignmentDateForCommission(commissionNumber);
+  const nextAssignmentDate = getNextAssignmentDateForProject(projectId);
+  return { lastAssignmentDate, nextAssignmentDate };
+}
+
+function getLastAssignmentDateForCommission(commissionNumber) {
+  if (!commissionNumber) return '';
+  const normalizedCommission = String(commissionNumber).trim().toLowerCase();
+  const reports = state.weeklyReportHistory.length ? state.weeklyReportHistory : state.weeklyReports;
+  let latestDate = '';
+  for (const report of reports) {
+    const reportCommission = String(report?.commission_number || '').trim().toLowerCase();
+    const reportDate = String(report?.work_date || '').trim();
+    if (!reportDate || reportCommission !== normalizedCommission) continue;
+    if (!latestDate || reportDate > latestDate) {
+      latestDate = reportDate;
+    }
+  }
+  return latestDate;
+}
+
+function getNextAssignmentDateForProject(projectId) {
+  if (!projectId) return '';
+  const normalizedProjectId = String(projectId);
+  const assignments = state.upcomingDailyAssignments.length ? state.upcomingDailyAssignments : state.dailyAssignments;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  let nextDate = '';
+  for (const entry of assignments) {
+    const assignmentDate = String(entry?.assignment_date || '').trim();
+    if (!assignmentDate || assignmentDate < todayIso) continue;
+    const projectIds = getProjectIdsFromDispoAssignment(entry);
+    if (!projectIds.has(normalizedProjectId)) continue;
+    if (!nextDate || assignmentDate < nextDate) {
+      nextDate = assignmentDate;
+    }
+  }
+  return nextDate;
+}
+
+function getProjectIdsFromDispoAssignment(entry) {
+  const projectIds = new Set();
+  if (entry?.project_id) {
+    projectIds.add(String(entry.project_id));
+  }
+  for (const item of getDispoItemsForEntry(entry)) {
+    if (item?.project_id) {
+      projectIds.add(String(item.project_id));
+    }
+  }
+  return projectIds;
 }
 
 function renderDispoPlanner() {
@@ -5437,13 +5538,36 @@ function upsertLocalDailyAssignment(entry) {
   const index = state.dailyAssignments.findIndex((item) => item.profile_id === entry.profile_id && item.assignment_date === entry.assignment_date);
   if (index >= 0) {
     state.dailyAssignments[index] = entry;
-    return;
+  } else {
+    state.dailyAssignments.push(entry);
   }
-  state.dailyAssignments.push(entry);
+  upsertUpcomingDailyAssignment(entry);
 }
 
 function removeLocalDailyAssignment(profileId, date) {
   state.dailyAssignments = state.dailyAssignments.filter((item) => !(item.profile_id === profileId && item.assignment_date === date));
+  removeUpcomingDailyAssignment(profileId, date);
+}
+
+function upsertUpcomingDailyAssignment(entry) {
+  if (!entry) return;
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const assignmentDate = String(entry.assignment_date || '');
+  const keyMatch = (item) => item.profile_id === entry.profile_id && item.assignment_date === entry.assignment_date;
+  if (assignmentDate < todayIso) {
+    state.upcomingDailyAssignments = state.upcomingDailyAssignments.filter((item) => !keyMatch(item));
+    return;
+  }
+  const index = state.upcomingDailyAssignments.findIndex((item) => keyMatch(item));
+  if (index >= 0) {
+    state.upcomingDailyAssignments[index] = entry;
+  } else {
+    state.upcomingDailyAssignments.push(entry);
+  }
+}
+
+function removeUpcomingDailyAssignment(profileId, date) {
+  state.upcomingDailyAssignments = state.upcomingDailyAssignments.filter((item) => !(item.profile_id === profileId && item.assignment_date === date));
 }
 
 function serializeDispoItems(items = []) {
@@ -5718,6 +5842,7 @@ async function saveDispoAssignment({ profileId, date, items = [], source = 'manu
     }
     removeLocalDailyAssignment(profileId, date);
     if (!silent || !suppressReload) renderDispoPlanner();
+    renderProjectsTable();
     return { saved: true, error: null };
   }
   const payload = {
@@ -5750,6 +5875,7 @@ async function saveDispoAssignment({ profileId, date, items = [], source = 'manu
   }
   upsertLocalDailyAssignment(entry);
   if (!silent || !suppressReload) renderDispoPlanner();
+  renderProjectsTable();
   if (!silent) showInlineAlert(elements.dispoAlert, 'Dispo gespeichert.', false);
   return { saved: true, error: null };
 }
