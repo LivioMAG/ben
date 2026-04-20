@@ -379,7 +379,6 @@ create table if not exists public.properties (
   id uuid primary key default gen_random_uuid(),
   contact_id uuid not null references public.crm_contacts(id) on delete cascade,
   name text not null,
-  adresse text not null,
   strasse text not null,
   postleitzahl text not null,
   ort text not null,
@@ -389,6 +388,9 @@ create table if not exists public.properties (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table if exists public.properties
+  drop column if exists adresse;
 
 do $$
 begin

@@ -4414,7 +4414,7 @@ function renderPropertiesTable() {
     const documents = Array.isArray(property.dokumente) ? property.dokumente : [];
     const latestNote = notes.at(-1);
     const locationParts = [property.strasse, [property.postleitzahl, property.ort].filter(Boolean).join(' ')].filter(Boolean);
-    const locationLabel = locationParts.join(', ') || property.adresse || '–';
+    const locationLabel = locationParts.join(', ') || '–';
     const documentLinks = documents.length
       ? `<ul>${documents.map((document) => {
         const url = getAttachmentUrl(document);
