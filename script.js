@@ -1964,6 +1964,7 @@ function renderPages() {
   };
 
   elements.pageTitle.textContent = pageTitles[state.currentPage];
+  elements.appView?.classList.toggle('dashboard-minimal', state.currentPage === 'dashboard');
 
   for (const [key, page] of Object.entries(elements.pages)) {
     if (!page) continue;
