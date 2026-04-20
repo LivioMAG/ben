@@ -1373,7 +1373,16 @@ tbody tr:hover {
 
 .dispo-gap-results ul {
   margin: 0;
-  padding-left: 18px;
+  padding-left: 0;
+  list-style: none;
   display: grid;
-  gap: 4px;
+  gap: 8px;
+}
+
+.dispo-gap-result-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 0;
 }

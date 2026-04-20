@@ -4,10 +4,10 @@ const PROJECTS_TABLE = 'projects';
 const ATTACHMENTS_BUCKET = 'project-kanban-attachments';
 const DOCUMENT_ACCEPT = 'application/pdf,image/*,audio/*';
 const KANBAN_COLUMNS = [
-  { key: 'todo', label: 'To-dos' },
-  { key: 'planned', label: 'Geplant' },
+  { key: 'todo', label: 'Neue Aufträge' },
+  { key: 'planned', label: 'AVOR' },
   { key: 'in_progress', label: 'In Bearbeitung' },
-  { key: 'review', label: 'AI' },
+  { key: 'review', label: 'Backoffice' },
   { key: 'done', label: 'Erledigt' },
 ];
 
@@ -23,6 +23,7 @@ const state = {
   activeCounterHistoryNoteId: null,
   activeTodoHistoryNoteId: null,
   pendingFocus: null,
+  scheduleStatus: { lastAssignmentDate: '', nextAssignmentDate: '' },
 };
 
 const elements = {};
@@ -53,6 +54,9 @@ function cacheElements() {
   elements.projectTitle = document.getElementById('projectTitle');
   elements.projectMeta = document.getElementById('projectMeta');
   elements.projectBudget = document.getElementById('projectBudget');
+  elements.projectLastAssignment = document.getElementById('projectLastAssignment');
+  elements.projectNextAssignment = document.getElementById('projectNextAssignment');
+  elements.projectGapSearchButton = document.getElementById('projectGapSearchButton');
   elements.kanbanBoard = document.getElementById('kanbanBoard');
   elements.alert = document.getElementById('alert');
   elements.openDocumentsButton = document.getElementById('openDocumentsButton');
@@ -104,6 +108,7 @@ function bindEvents() {
   elements.attachmentModalContent?.addEventListener('change', handleAttachmentModalChange);
 
   elements.openDocumentsButton?.addEventListener('click', openDocumentsModal);
+  elements.projectGapSearchButton?.addEventListener('click', openProjectGapSearchInDispo);
   elements.closeDocumentsModalButton?.addEventListener('click', closeDocumentsModal);
   elements.documentsModalBackdrop?.addEventListener('click', closeDocumentsModal);
   elements.closeCounterHistoryModalButton?.addEventListener('click', closeCounterHistoryModal);
@@ -131,6 +136,7 @@ async function loadData() {
 
   state.project = projectResult.data;
   state.notes = notesResult.data || [];
+  state.scheduleStatus = await loadProjectScheduleStatus(state.project);
   render();
 }
 
@@ -140,6 +146,9 @@ function render() {
   elements.projectMeta.textContent = commission;
   const budget = Number(state.project?.budget || 0);
   elements.projectBudget.textContent = `Budget: ${budget > 0 ? formatCurrency(budget) : '–'}`;
+  elements.projectLastAssignment.textContent = state.scheduleStatus.lastAssignmentDate ? formatDate(state.scheduleStatus.lastAssignmentDate) : '—';
+  elements.projectNextAssignment.textContent = state.scheduleStatus.nextAssignmentDate ? formatDate(state.scheduleStatus.nextAssignmentDate) : '—';
+  elements.projectGapSearchButton?.classList.toggle('hidden', Boolean(state.scheduleStatus.nextAssignmentDate));
   renderBoard();
   if (!elements.noteTypeModal?.classList.contains('hidden')) renderNoteTypeOptions();
   if (!elements.attachmentModal?.classList.contains('hidden')) renderAttachmentModal();
@@ -153,6 +162,46 @@ function render() {
     renderTodoHistoryModal();
   }
   restorePendingFocus();
+}
+
+async function loadProjectScheduleStatus(project) {
+  const commissionNumber = String(project?.commission_number || '').trim();
+  const projectId = String(project?.id || '').trim();
+  if (!projectId || !commissionNumber) return { lastAssignmentDate: '', nextAssignmentDate: '' };
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const [lastReportResult, upcomingResult] = await Promise.all([
+    state.supabase
+      .from('weekly_reports')
+      .select('work_date')
+      .eq('commission_number', commissionNumber)
+      .order('work_date', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    state.supabase
+      .from('daily_assignments')
+      .select('assignment_date')
+      .eq('project_id', projectId)
+      .gte('assignment_date', todayIso)
+      .order('assignment_date', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  if (lastReportResult.error) throw lastReportResult.error;
+  if (upcomingResult.error) throw upcomingResult.error;
+  return {
+    lastAssignmentDate: String(lastReportResult.data?.work_date || ''),
+    nextAssignmentDate: String(upcomingResult.data?.assignment_date || ''),
+  };
+}
+
+function openProjectGapSearchInDispo() {
+  if (!state.project?.id) return;
+  const detailUrl = new URL('./index.html', window.location.href);
+  detailUrl.searchParams.set('page', 'dispo');
+  detailUrl.searchParams.set('gapSearch', '1');
+  detailUrl.searchParams.set('projectId', String(state.project.id));
+  detailUrl.searchParams.set('week', getCurrentWeekValue());
+  window.location.href = detailUrl.toString();
 }
 
 function renderBoard() {
@@ -1137,6 +1186,23 @@ function formatTimestamp(value) {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
+}
+
+function formatDate(value) {
+  if (!value) return '–';
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return '–';
+  return new Intl.DateTimeFormat('de-CH', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(parsed);
+}
+
+function getCurrentWeekValue() {
+  const now = new Date();
+  const utcDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const day = utcDate.getUTCDay() || 7;
+  utcDate.setUTCDate(utcDate.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(utcDate.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((utcDate - yearStart) / 86400000) + 1) / 7);
+  return `${utcDate.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
 }
 
 function showAlert(message, isError = false) {

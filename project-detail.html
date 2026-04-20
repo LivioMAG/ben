@@ -42,6 +42,19 @@
           </header>
 
           <div id="alert" class="alert hidden"></div>
+          <section class="project-schedule-panel" aria-label="Einsatzplanung">
+            <div class="project-schedule-grid">
+              <div>
+                <span class="subtle-label">Letzter Einsatz</span>
+                <strong id="projectLastAssignment">—</strong>
+              </div>
+              <div>
+                <span class="subtle-label">Geplanter Einsatz</span>
+                <strong id="projectNextAssignment">—</strong>
+              </div>
+            </div>
+            <button id="projectGapSearchButton" class="button-secondary hidden" type="button">Freie Lücken suchen</button>
+          </section>
 
           <p class="board-hint">Direkte Bearbeitung in den Karten – ohne Seitenpanel.</p>
           <section class="kanban-board" id="kanbanBoard" aria-label="Kanban Board"></section>
