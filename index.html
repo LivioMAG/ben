@@ -53,6 +53,10 @@
       <section id="appView" class="dashboard view hidden">
         <aside class="sidebar panel">
           <nav class="nav-tabs">
+            <button class="nav-tab" data-page="dashboard" type="button" title="Dashboard" aria-label="Dashboard">
+              <span class="nav-tab-icon" aria-hidden="true">🧠</span>
+              <span class="visually-hidden">Dashboard</span>
+            </button>
             <button class="nav-tab active" data-page="reports" type="button" title="Wochenrapporte" aria-label="Wochenrapporte">
               <span class="nav-tab-icon" aria-hidden="true">📅</span>
               <span class="visually-hidden">Wochenrapporte</span>
@@ -110,6 +114,29 @@
               <span id="dataTimestamp" class="subtle-text">Noch keine Daten geladen</span>
             </div>
           </header>
+
+          <section id="dashboardPage" class="page hidden">
+            <div id="notesDashboardPanel" class="panel notes-dashboard-panel">
+              <div class="section-heading compact">
+                <div>
+                  <h3>Notiz-Dashboard</h3>
+                  <p>Doppelklick auf freie Fläche erstellt sofort eine Notiz. Ziehen auf den Papierkorb löscht sie.</p>
+                </div>
+              </div>
+              <div id="notesDashboardCanvas" class="notes-dashboard-canvas" aria-label="Benutzer-Notizen"></div>
+              <div id="notesDashboardActionBar" class="notes-dashboard-action-bar" aria-hidden="true">
+                <button class="dashboard-action-icon trash" type="button" data-role="trash" title="Papierkorb">🗑️</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">⭐</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">📌</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🔔</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🧩</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🗂️</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🧠</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🔒</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">⚙️</button>
+              </div>
+            </div>
+          </section>
 
           <section id="reportsPage" class="page active">
             <div class="toolbar panel">
@@ -221,26 +248,6 @@
               </div>
             </div>
 
-            <div id="notesDashboardPanel" class="panel notes-dashboard-panel">
-              <div class="section-heading compact">
-                <div>
-                  <h3>Notiz-Dashboard</h3>
-                  <p>Doppelklick auf freie Fläche erstellt sofort eine Notiz. Ziehen auf den Papierkorb löscht sie.</p>
-                </div>
-              </div>
-              <div id="notesDashboardCanvas" class="notes-dashboard-canvas" aria-label="Benutzer-Notizen"></div>
-              <div id="notesDashboardActionBar" class="notes-dashboard-action-bar" aria-hidden="true">
-                <button class="dashboard-action-icon trash" type="button" data-role="trash" title="Papierkorb">🗑️</button>
-                <button class="dashboard-action-icon" type="button" disabled title="Reserve">⭐</button>
-                <button class="dashboard-action-icon" type="button" disabled title="Reserve">📌</button>
-                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🔔</button>
-                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🧩</button>
-                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🗂️</button>
-                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🧠</button>
-                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🔒</button>
-                <button class="dashboard-action-icon" type="button" disabled title="Reserve">⚙️</button>
-              </div>
-            </div>
           </section>
 
           <section id="absencesPage" class="page hidden">
