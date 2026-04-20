@@ -2,18 +2,12 @@ const CONFIG_PATH = './supabase-config.json';
 const KANBAN_TABLE = 'project_kanban_notes';
 const PROJECTS_TABLE = 'projects';
 const KANBAN_COLUMNS = [
-  { key: 'todo', label: 'To-Do', color: '#8b5cf6', tint: '#f4efff' },
-  { key: 'planned', label: 'Geplant', color: '#0ea5e9', tint: '#ebf8ff' },
-  { key: 'in_progress', label: 'In Bearbeitung', color: '#f59e0b', tint: '#fff7e8' },
-  { key: 'review', label: 'Kontrolle', color: '#ef4444', tint: '#ffeef0' },
-  { key: 'done', label: 'Erledigt', color: '#10b981', tint: '#e9fbf3' },
+  { key: 'todo', label: 'To-Do' },
+  { key: 'planned', label: 'Geplant' },
+  { key: 'in_progress', label: 'In Bearbeitung' },
+  { key: 'review', label: 'AI' },
+  { key: 'done', label: 'Erledigt' },
 ];
-
-const NOTE_TYPE_LABELS = {
-  text: 'Text',
-  todo: 'To-do',
-  counter: 'Counter',
-};
 
 const state = {
   supabase: null,
@@ -81,16 +75,14 @@ function bindEvents() {
     window.location.href = './index.html';
   });
 
-  elements.kanbanBoard?.addEventListener('dblclick', handleColumnDoubleClick);
+  elements.kanbanBoard?.addEventListener('click', handleBoardClick);
   elements.kanbanBoard?.addEventListener('dragstart', handleDragStart);
   elements.kanbanBoard?.addEventListener('dragover', handleDragOver);
   elements.kanbanBoard?.addEventListener('drop', handleDrop);
 
   elements.closeModalButton?.addEventListener('click', closeModal);
   elements.modalBackdrop?.addEventListener('click', closeModal);
-  elements.addNoteButton?.addEventListener('click', () => {
-    elements.createNoteForm?.classList.toggle('hidden');
-  });
+  elements.addNoteButton?.addEventListener('click', openCreateNoteForm);
   elements.newNoteType?.addEventListener('change', updateCreateTypeFields);
   elements.createNoteForm?.addEventListener('submit', handleCreateNote);
   elements.modalNotesList?.addEventListener('click', handleModalClick);
@@ -134,44 +126,79 @@ function renderBoard() {
   elements.kanbanBoard.innerHTML = KANBAN_COLUMNS.map((column) => {
     const notes = getNotesByColumn(column.key);
     return `
-      <section class="kanban-column" data-column="${escapeAttribute(column.key)}" style="border-top-color:${escapeAttribute(column.color)}; background:${escapeAttribute(column.tint)};">
+      <section class="kanban-column" data-column="${escapeAttribute(column.key)}">
         <header>
           <span>${escapeHtml(column.label)}</span>
           <span class="count">${notes.length}</span>
         </header>
         <div class="kanban-dropzone" data-column="${escapeAttribute(column.key)}">
-          ${notes.length ? notes.map((note) => renderPreviewCard(note, column.color)).join('') : '<p class="column-empty">Keine Notizen</p>'}
+          ${notes.length ? notes.map((note) => renderPreviewCard(note)).join('') : '<p class="column-empty">Keine Notizen</p>'}
         </div>
       </section>
     `;
   }).join('');
 }
 
-function renderPreviewCard(note, color) {
+function renderPreviewCard(note) {
   const noteType = getNoteType(note);
-  const title = String(note.title || '').trim() || 'Ohne Titel';
+  const title = String(note.title || '').trim();
+  const previewText = getPreviewText(note, noteType);
+  const progress = getPreviewProgress(note, noteType);
+  const titleMarkup = title ? `<h3 class="note-preview-title">${escapeHtml(title)}</h3>` : '';
+  const progressMarkup = progress ? `
+    <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${escapeAttribute(progress.percent)}">
+      <div class="preview-progress-fill" style="width:${escapeAttribute(progress.percent)}%;"></div>
+    </div>
+    <p class="note-preview-meta">${escapeHtml(progress.label)}</p>
+  ` : '';
   return `
-    <article class="note-preview" draggable="true" data-note-id="${escapeAttribute(note.id)}" style="border-left-color:${escapeAttribute(color)};">
-      <span class="type-badge">${escapeHtml(NOTE_TYPE_LABELS[noteType] || 'Notiz')}</span>
-      <h3 class="note-preview-title">${escapeHtml(title)}</h3>
-      <p class="note-preview-text">${escapeHtml(getPreviewText(note, noteType))}</p>
+    <article class="note-preview" draggable="true" data-note-id="${escapeAttribute(note.id)}" data-column="${escapeAttribute(note.status)}">
+      ${titleMarkup}
+      <p class="note-preview-text">${escapeHtml(previewText)}</p>
+      ${progressMarkup}
     </article>
   `;
 }
 
 function getPreviewText(note, noteType) {
   if (noteType === 'todo') {
-    const items = normalizeTodoItems(note.todo_items);
-    const done = items.filter((item) => item.done).length;
-    return `${done}/${items.length} To-dos erledigt`;
+    return String(note.title || '').trim() || 'To-do-Notiz';
   }
   if (noteType === 'counter') {
-    return `Wert: ${Number(note.counter_value ?? 0)}`;
+    const description = String(note.counter_description || '').trim();
+    if (description) return truncateText(description, 100);
+    return String(note.title || '').trim() || 'Counter-Notiz';
   }
-  return String(note.content || '').slice(0, 90) || 'Kein Inhalt';
+  return truncateText(String(note.content || '').trim(), 100) || 'Kein Inhalt';
 }
 
-function handleColumnDoubleClick(event) {
+function getPreviewProgress(note, noteType) {
+  if (noteType === 'todo') {
+    const items = normalizeTodoItems(note.todo_items);
+    if (!items.length) return { percent: 0, label: '0/0 erledigt' };
+    const done = items.filter((item) => item.done).length;
+    const percent = Math.round((done / items.length) * 100);
+    return { percent, label: `${done}/${items.length} erledigt` };
+  }
+  if (noteType === 'counter') {
+    const start = Math.max(0, Number(note.counter_start_value ?? 0));
+    const current = Math.max(0, Number(note.counter_value ?? 0));
+    const completed = start > 0 ? Math.min(start, Math.max(0, start - current)) : 0;
+    const percent = start > 0 ? Math.round((completed / start) * 100) : 0;
+    return { percent, label: `${current} offen` };
+  }
+  return null;
+}
+
+function handleBoardClick(event) {
+  const preview = event.target.closest('.note-preview');
+  if (preview) {
+    const columnKey = String(preview.dataset.column || '').trim();
+    if (!columnKey) return;
+    openModal(columnKey, String(preview.dataset.noteId || '').trim());
+    return;
+  }
+
   const column = event.target.closest('.kanban-column');
   if (!column) return;
   const columnKey = String(column.dataset.column || '').trim();
@@ -179,17 +206,21 @@ function handleColumnDoubleClick(event) {
   openModal(columnKey);
 }
 
-function openModal(columnKey) {
+function openModal(columnKey, focusNoteId = '') {
   const columnMeta = getColumnMeta(columnKey);
   state.activeColumnKey = columnKey;
   elements.modalTitle.textContent = `${columnMeta.label} – Notizen`;
-  elements.modalHeader.style.borderBottomColor = columnMeta.color;
-  elements.modalHeader.style.boxShadow = `inset 0 -2px 0 ${columnMeta.color}`;
   elements.createNoteForm.classList.add('hidden');
   elements.createNoteForm.reset();
   updateCreateTypeFields();
   elements.modal.classList.remove('hidden');
   renderModalNotes();
+  if (focusNoteId) {
+    requestAnimationFrame(() => {
+      const target = elements.modalNotesList?.querySelector(`[data-note-id="${focusNoteId}"]`);
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
 }
 
 function closeModal() {
@@ -199,7 +230,6 @@ function closeModal() {
 
 function renderModalNotes() {
   if (!state.activeColumnKey || !elements.modalNotesList) return;
-  const columnMeta = getColumnMeta(state.activeColumnKey);
   const notes = getNotesByColumn(state.activeColumnKey);
 
   if (!notes.length) {
@@ -207,19 +237,19 @@ function renderModalNotes() {
     return;
   }
 
-  elements.modalNotesList.innerHTML = notes.map((note) => renderModalNoteCard(note, columnMeta)).join('');
+  elements.modalNotesList.innerHTML = notes.map((note) => renderModalNoteCard(note)).join('');
 }
 
-function renderModalNoteCard(note, columnMeta) {
+function renderModalNoteCard(note) {
   const noteType = getNoteType(note);
-  if (noteType === 'todo') return renderTodoCard(note, columnMeta);
-  if (noteType === 'counter') return renderCounterCard(note, columnMeta);
-  return renderTextCard(note, columnMeta);
+  if (noteType === 'todo') return renderTodoCard(note);
+  if (noteType === 'counter') return renderCounterCard(note);
+  return renderTextCard(note);
 }
 
-function renderTextCard(note, columnMeta) {
+function renderTextCard(note) {
   return `
-    <article class="note-card note-type-text" data-note-id="${escapeAttribute(note.id)}" style="border-left-color:${escapeAttribute(columnMeta.color)};">
+    <article class="note-card note-type-text" data-note-id="${escapeAttribute(note.id)}">
       <header class="note-card-header">
         <span class="type-badge">Text</span>
         <div class="note-card-actions">
@@ -237,10 +267,10 @@ function renderTextCard(note, columnMeta) {
   `;
 }
 
-function renderTodoCard(note, columnMeta) {
+function renderTodoCard(note) {
   const items = normalizeTodoItems(note.todo_items);
   return `
-    <article class="note-card note-type-todo" data-note-id="${escapeAttribute(note.id)}" style="border-left-color:${escapeAttribute(columnMeta.color)};">
+    <article class="note-card note-type-todo" data-note-id="${escapeAttribute(note.id)}">
       <header class="note-card-header">
         <span class="type-badge">To-do</span>
         <div class="note-card-actions">
@@ -267,11 +297,11 @@ function renderTodoCard(note, columnMeta) {
   `;
 }
 
-function renderCounterCard(note, columnMeta) {
+function renderCounterCard(note) {
   const value = Number(note.counter_value ?? note.counter_start_value ?? 0);
   const log = normalizeCounterLog(note.counter_log);
   return `
-    <article class="note-card note-type-counter" data-note-id="${escapeAttribute(note.id)}" style="border-left-color:${escapeAttribute(columnMeta.color)};">
+    <article class="note-card note-type-counter" data-note-id="${escapeAttribute(note.id)}">
       <header class="note-card-header">
         <span class="type-badge">Counter</span>
         <div class="note-card-actions">
@@ -349,9 +379,7 @@ async function handleCreateNote(event) {
     return;
   }
 
-  elements.createNoteForm.reset();
-  updateCreateTypeFields();
-  elements.createNoteForm.classList.add('hidden');
+  openCreateNoteForm();
   await loadData();
 }
 
@@ -429,6 +457,15 @@ function updateCreateTypeFields() {
     const type = String(element.dataset.type || '');
     element.classList.toggle('hidden', type !== selected);
   });
+}
+
+function openCreateNoteForm() {
+  if (!elements.createNoteForm) return;
+  elements.createNoteForm.classList.remove('hidden');
+  elements.createNoteForm.reset();
+  if (elements.newNoteType) elements.newNoteType.value = 'text';
+  updateCreateTypeFields();
+  elements.newNoteTitle?.focus();
 }
 
 async function saveTextNote(noteId) {
@@ -619,4 +656,10 @@ function escapeHtml(value) {
 
 function escapeAttribute(value) {
   return escapeHtml(value);
+}
+
+function truncateText(value, maxLength) {
+  const text = String(value || '').trim();
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength)}…`;
 }
