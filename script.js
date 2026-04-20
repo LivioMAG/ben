@@ -353,14 +353,9 @@ as $$
 declare
   deleted_request public.holiday_requests%rowtype;
 begin
-  with removed_request as (
-    delete from public.holiday_requests
-    where id = p_request_id
-    returning *
-  )
-  select *
-  into deleted_request
-  from removed_request;
+  delete from public.holiday_requests
+  where id = p_request_id
+  returning * into deleted_request;
 
   if not found then
     raise exception 'Absenzgesuch % wurde nicht gefunden.', p_request_id;
