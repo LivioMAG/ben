@@ -1,5 +1,6 @@
 const STORAGE_BUCKET = 'weekly-attachments';
 const CRM_NOTE_STORAGE_BUCKET = 'crm-note-attachments';
+const PROPERTY_DOCUMENT_STORAGE_BUCKET = 'crm-note-attachments';
 const CONFIG_PATH = './supabase-config.json';
 const HOLIDAY_TABLE = 'platform_holidays';
 const NOTES_TABLE = 'notes';
@@ -891,7 +892,8 @@ function cacheElements() {
   elements.propertyCityInput = document.getElementById('propertyCityInput');
   elements.propertyBudgetInput = document.getElementById('propertyBudgetInput');
   elements.propertyNoteInput = document.getElementById('propertyNoteInput');
-  elements.propertyDocumentInput = document.getElementById('propertyDocumentInput');
+  elements.propertyDocumentFileInput = document.getElementById('propertyDocumentFileInput');
+  elements.propertyDocumentsPreview = document.getElementById('propertyDocumentsPreview');
   elements.resetPropertyFormButton = document.getElementById('resetPropertyFormButton');
   elements.propertiesTableBody = document.getElementById('propertiesTableBody');
 }
@@ -3283,21 +3285,59 @@ function resetPropertyForm() {
   if (elements.propertyIdInput) {
     elements.propertyIdInput.value = '';
   }
+  renderPropertyDocumentsPreview([]);
 }
 
-function parsePropertyDocumentInput(rawValue) {
-  const normalized = String(rawValue || '').trim();
-  if (!normalized) {
-    return null;
+function renderPropertyDocumentsPreview(documents) {
+  if (!elements.propertyDocumentsPreview) return;
+  const safeDocuments = Array.isArray(documents) ? documents : [];
+  if (!safeDocuments.length) {
+    elements.propertyDocumentsPreview.innerHTML = 'Noch keine Dokumente vorhanden.';
+    return;
   }
-  const parsed = JSON.parse(normalized);
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error('Dokument muss ein JSON-Objekt sein.');
+  const listMarkup = safeDocuments.map((document) => {
+    const url = getAttachmentUrl(document);
+    const name = String(document?.name || 'Dokument');
+    if (!url) {
+      return `<li>${escapeHtml(name)}</li>`;
+    }
+    return `<li><a href="${escapeAttribute(url)}" target="_blank" rel="noopener">${escapeHtml(name)}</a></li>`;
+  }).join('');
+  elements.propertyDocumentsPreview.innerHTML = `<strong>Vorhandene Dokumente:</strong><ul>${listMarkup}</ul>`;
+}
+
+async function uploadPropertyDocuments(propertyId, files) {
+  const uploadFiles = Array.from(files || []).filter((file) => file instanceof File);
+  if (!uploadFiles.length) return [];
+  if (!state.supabase) {
+    throw new Error('Keine Verbindung zu Supabase.');
   }
-  return {
-    ...parsed,
-    created_at: parsed.created_at || new Date().toISOString(),
-  };
+
+  const safePropertyId = String(propertyId || 'neu').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64) || 'neu';
+  const uploadedDocuments = [];
+  for (const file of uploadFiles) {
+    const safeName = String(file.name || 'dokument')
+      .trim()
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .slice(0, 120) || 'dokument';
+    const path = `properties/${safePropertyId}/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+    const { error } = await state.supabase.storage.from(PROPERTY_DOCUMENT_STORAGE_BUCKET).upload(path, file, {
+      upsert: false,
+      contentType: file.type || 'application/octet-stream',
+    });
+    if (error) throw error;
+    const { data } = state.supabase.storage.from(PROPERTY_DOCUMENT_STORAGE_BUCKET).getPublicUrl(path);
+    uploadedDocuments.push({
+      name: file.name || safeName,
+      mimeType: file.type || 'application/octet-stream',
+      size: file.size || 0,
+      bucket: PROPERTY_DOCUMENT_STORAGE_BUCKET,
+      path,
+      publicUrl: String(data?.publicUrl || '').trim(),
+      created_at: new Date().toISOString(),
+    });
+  }
+  return uploadedDocuments;
 }
 
 async function handlePropertySubmit(event) {
@@ -3313,7 +3353,7 @@ async function handlePropertySubmit(event) {
   const city = String(elements.propertyCityInput?.value || '').trim();
   const budgetRaw = Number(elements.propertyBudgetInput?.value || 0);
   const noteText = String(elements.propertyNoteInput?.value || '').trim();
-  const documentRaw = String(elements.propertyDocumentInput?.value || '').trim();
+  const documentFiles = elements.propertyDocumentFileInput?.files;
 
   if (!contactId || !name || !address || !street || !postalCode || !city || Number.isNaN(budgetRaw) || budgetRaw <= 0) {
     showInlineAlert(elements.propertiesAlert, 'Bitte CRM-Kontakt, Name, Adresse, Strasse, PLZ, Ort und Budget korrekt ausfüllen.', true);
@@ -3324,37 +3364,31 @@ async function handlePropertySubmit(event) {
   const nextNotes = Array.isArray(existingProperty?.notizen) ? [...existingProperty.notizen] : [];
   const nextDocuments = Array.isArray(existingProperty?.dokumente) ? [...existingProperty.dokumente] : [];
 
-  try {
-    if (noteText) {
-      nextNotes.push({
-        text: noteText,
-        author: getApprovalDisplayName(),
-        created_at: new Date().toISOString(),
-      });
-    }
-    const parsedDocument = parsePropertyDocumentInput(documentRaw);
-    if (parsedDocument) {
-      nextDocuments.push(parsedDocument);
-    }
-  } catch (error) {
-    showInlineAlert(elements.propertiesAlert, `Dokument konnte nicht verarbeitet werden: ${error.message}`, true);
-    return;
+  if (noteText) {
+    nextNotes.push({
+      text: noteText,
+      author: getApprovalDisplayName(),
+      created_at: new Date().toISOString(),
+    });
   }
-
-  const payload = {
-    contact_id: contactId,
-    name,
-    adresse: address,
-    strasse: street,
-    postleitzahl: postalCode,
-    ort: city,
-    budget: budgetRaw,
-    notizen: nextNotes,
-    dokumente: nextDocuments,
-  };
 
   state.isSavingSettings = true;
   try {
+    const newDocuments = await uploadPropertyDocuments(propertyId || name, documentFiles);
+    if (newDocuments.length) {
+      nextDocuments.push(...newDocuments);
+    }
+    const payload = {
+      contact_id: contactId,
+      name,
+      adresse: address,
+      strasse: street,
+      postleitzahl: postalCode,
+      ort: city,
+      budget: budgetRaw,
+      notizen: nextNotes,
+      dokumente: nextDocuments,
+    };
     const query = propertyId
       ? state.supabase.from(PROPERTIES_TABLE).update(payload).eq('id', propertyId)
       : state.supabase.from(PROPERTIES_TABLE).insert(payload);
@@ -3391,7 +3425,8 @@ async function handlePropertiesTableClick(event) {
     if (elements.propertyCityInput) elements.propertyCityInput.value = property.ort || '';
     if (elements.propertyBudgetInput) elements.propertyBudgetInput.value = Number(property.budget || 0).toFixed(2);
     if (elements.propertyNoteInput) elements.propertyNoteInput.value = '';
-    if (elements.propertyDocumentInput) elements.propertyDocumentInput.value = '';
+    if (elements.propertyDocumentFileInput) elements.propertyDocumentFileInput.value = '';
+    renderPropertyDocumentsPreview(property.dokumente);
     showInlineAlert(elements.propertiesAlert, 'Immobilie zum Bearbeiten geladen.', false);
     return;
   }
@@ -4382,6 +4417,16 @@ function renderPropertiesTable() {
     const notes = Array.isArray(property.notizen) ? property.notizen : [];
     const documents = Array.isArray(property.dokumente) ? property.dokumente : [];
     const latestNote = notes.at(-1);
+    const documentLinks = documents.length
+      ? `<ul>${documents.map((document) => {
+        const url = getAttachmentUrl(document);
+        const name = String(document?.name || 'Dokument');
+        if (!url) {
+          return `<li>${escapeHtml(name)}</li>`;
+        }
+        return `<li><a href="${escapeAttribute(url)}" target="_blank" rel="noopener">${escapeHtml(name)}</a></li>`;
+      }).join('')}</ul>`
+      : '<span class="subtle-text">Keine Dokumente</span>';
 
     return `<tr>
       <td>${escapeHtml(property.name || '–')}</td>
@@ -4389,7 +4434,7 @@ function renderPropertiesTable() {
       <td>${escapeHtml(property.adresse || '–')}</td>
       <td>${escapeHtml(formatCurrency(Number(property.budget || 0)))}</td>
       <td>${latestNote ? `${escapeHtml(String(latestNote.text || ''))}<br><span class="subtle-text">${escapeHtml(String(latestNote.author || 'Unbekannt'))}</span>` : '<span class="subtle-text">Keine Notiz</span>'}</td>
-      <td>${documents.length}</td>
+      <td>${documentLinks}</td>
       <td>
         <div class="table-actions">
           <button class="button button-small button-secondary" type="button" data-action="edit-property" data-property-id="${escapeAttribute(property.id)}">Bearbeiten</button>

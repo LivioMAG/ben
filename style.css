@@ -459,6 +459,19 @@ textarea:focus {
   grid-column: span 3;
 }
 
+.property-documents-preview {
+  grid-column: span 3;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.property-documents-preview ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
 .crm-notes-card {
   margin-top: 20px;
   padding: 20px;
