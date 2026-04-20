@@ -166,7 +166,7 @@ body {
   border-radius: 16px;
   padding: 16px;
   min-height: 140px;
-  max-height: 220px;
+  max-height: 280px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -181,6 +181,7 @@ body {
 .card-type-wrap { display: flex; align-items: center; gap: 6px; }
 .card-type-icon { font-size: 16px; }
 .card-actions-inline { display: inline-flex; gap: 4px; }
+.badge-count { font-size: 11px; font-weight: 700; }
 .icon-plain {
   width: 28px;
   height: 28px;
@@ -188,6 +189,23 @@ body {
   border-radius: 8px;
   background: rgba(226, 232, 240, 0.75);
   cursor: pointer;
+}
+
+.type-switch-inline {
+  border: 0;
+  background: #eef2ff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.card-content-scroll {
+  max-height: 110px;
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+  padding-right: 2px;
 }
 .attach-icon { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; }
 .attach-icon input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
@@ -251,8 +269,7 @@ body {
 .note-type-todo .type-badge { background: #e0f2fe; }
 .note-type-counter .type-badge { background: #dcfce7; }
 
-.modal,
-.slide-panel {
+.modal {
   position: fixed;
   inset: 0;
   z-index: 30;
@@ -260,31 +277,12 @@ body {
   place-items: center;
 }
 
-.modal-backdrop,
-.slide-backdrop {
+.modal-backdrop {
   position: absolute;
   inset: 0;
   background: rgba(15, 23, 42, 0.42);
   backdrop-filter: blur(2px);
 }
-
-.slide-card {
-  margin-left: auto;
-  width: clamp(420px, 35vw, 520px);
-  max-width: calc(100vw - 24px);
-  height: 100vh;
-  background: #fff;
-  border-left: 1px solid rgba(148, 163, 184, 0.2);
-  box-shadow: -22px 0 42px rgba(15, 23, 42, 0.18);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  position: relative;
-}
-
-.slide-header { display: flex; justify-content: flex-end; align-items: center; }
-.panel-content { flex: 1; overflow: auto; display: grid; gap: 10px; padding-bottom: 4px; align-content: start; }
 
 .modal-card {
   position: relative;
@@ -299,6 +297,8 @@ body {
 }
 
 .documents-modal-card { width: min(900px, calc(100vw - 44px)); }
+.attachment-modal-card { width: min(680px, calc(100vw - 44px)); }
+.note-type-modal-card { width: min(420px, calc(100vw - 44px)); }
 
 .modal-header {
   display: flex;
@@ -323,37 +323,19 @@ body {
   cursor: pointer;
 }
 
-.create-note-form {
-  margin-top: 12px;
-  border-radius: 12px;
+.note-type-options { display: grid; gap: 10px; margin-top: 12px; }
+.note-type-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   border: 1px solid #e2e8f0;
+  border-radius: 12px;
   padding: 12px;
-  display: grid;
-  gap: 8px;
-  background: #f8fafc;
-}
-
-.create-note-form label,
-.note-card label {
-  display: grid;
-  gap: 4px;
-  font-size: 13px;
-  color: rgba(15, 23, 42, 0.86);
-}
-
-.create-note-form input,
-.create-note-form textarea,
-.create-note-form select,
-.note-card input,
-.note-card textarea {
-  width: 100%;
-  border: 1px solid #cbd5e1;
-  border-radius: 10px;
-  padding: 9px;
+  background: #fff;
+  cursor: pointer;
   font: inherit;
 }
-
-.form-actions { display: flex; justify-content: flex-end; }
+.note-type-option span { font-size: 22px; }
 
 .modal-notes-list {
   margin-top: 14px;
@@ -394,10 +376,21 @@ body {
 .todo-item-meta { font-size: 11px; color: rgba(15, 23, 42, 0.55); }
 .todo-inline-input { width: 100%; border: 0; border-bottom: 1px solid #d1d5db; border-radius: 0; padding: 6px 2px; background: transparent; }
 .todo-inline-text { width: 100%; border: 0; background: transparent; padding: 2px 0; font: inherit; color: inherit; }
+.todo-description-input,
+.counter-description-input {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #d1d5db;
+  border-radius: 0;
+  padding: 4px 2px;
+  background: transparent;
+  font: inherit;
+}
 .todo-inline-text:focus,
 .todo-inline-input:focus,
 .inline-note-text:focus,
-.section-description textarea:focus { outline: none; border-bottom-color: #0f172a; }
+.todo-description-input:focus,
+.counter-description-input:focus { outline: none; border-bottom-color: #0f172a; }
 
 .inline-row { display: flex; gap: 6px; }
 .inline-row input { flex: 1; }
@@ -530,33 +523,6 @@ body {
   letter-spacing: 0.05em;
 }
 
-.panel-section { padding: 0; background: transparent; display: grid; gap: 6px; }
-
-.panel-section h3 {
-  margin: 0;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(15, 23, 42, 0.58);
-}
-
-.section-description { min-height: 120px; }
-.section-content { min-height: 100px; }
-.section-documents { min-height: 70px; }
-
-.section-description textarea,
-.section-content textarea {
-  width: 100%;
-  min-height: 0;
-  height: 100%;
-  border: 0;
-  border-bottom: 1px solid #cbd5e1;
-  border-radius: 0;
-  padding: 6px 2px;
-  background: transparent;
-  resize: none;
-}
-
 .todo-scroll,
 .activity-scroll {
   overflow-y: auto;
@@ -649,24 +615,6 @@ body {
   font-weight: 600;
 }
 
-.panel-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-}
-.panel-actions-subtle .button-secondary,
-.panel-actions-subtle .button-danger { height: 30px; padding: 0 10px; font-size: 12px; }
-
-.attachments-header-minimal { display: flex; align-items: center; justify-content: space-between; }
-.attachments-header-minimal h3 { margin: 0; font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: 0; }
-
-.flat h3 {
-  margin: 0;
-  font-size: 13px;
-  color: rgba(15, 23, 42, 0.72);
-  text-transform: none;
-  letter-spacing: 0;
-}
 
 .inline-note-text {
   width: 100%;
@@ -681,12 +629,6 @@ body {
 }
 
 .counter-log.minimal { padding-left: 16px; margin: 4px 0 0; }
-
-.panel-actions .button-secondary,
-.panel-actions .button-danger {
-  height: 38px;
-  padding: 0 12px;
-}
 
 @media (max-width: 1280px) {
   .kanban-board { grid-template-columns: repeat(5, minmax(260px, 1fr)); }
