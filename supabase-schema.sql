@@ -973,3 +973,109 @@ with check (
   bucket_id = 'material-belege'
   and public.is_admin_user()
 );
+
+create table if not exists public.dashboard_notes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.app_profiles(id) on delete cascade,
+  content text not null default '',
+  pos_x integer not null default 0,
+  pos_y integer not null default 0,
+  width integer not null default 320,
+  height integer not null default 220,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  deleted_at timestamptz
+);
+
+create table if not exists public.dashboard_note_attachments (
+  id uuid primary key default gen_random_uuid(),
+  note_id uuid not null references public.dashboard_notes(id) on delete cascade,
+  user_id uuid not null references public.app_profiles(id) on delete cascade,
+  file_name text not null,
+  file_path text not null,
+  file_mime_type text,
+  file_size_bytes bigint not null default 0,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  deleted_at timestamptz
+);
+
+create index if not exists dashboard_notes_user_id_idx
+on public.dashboard_notes (user_id);
+
+create index if not exists dashboard_note_attachments_note_id_idx
+on public.dashboard_note_attachments (note_id);
+
+create trigger set_dashboard_notes_updated_at
+before update on public.dashboard_notes
+for each row
+execute function public.set_updated_at();
+
+create trigger set_dashboard_note_attachments_updated_at
+before update on public.dashboard_note_attachments
+for each row
+execute function public.set_updated_at();
+
+alter table public.dashboard_notes enable row level security;
+alter table public.dashboard_note_attachments enable row level security;
+
+drop policy if exists "dashboard notes read own or admin" on public.dashboard_notes;
+create policy "dashboard notes read own or admin"
+on public.dashboard_notes
+for select
+using (public.is_admin_user() or auth.uid() = user_id);
+
+drop policy if exists "dashboard notes write own or admin" on public.dashboard_notes;
+create policy "dashboard notes write own or admin"
+on public.dashboard_notes
+for all
+using (public.is_admin_user() or auth.uid() = user_id)
+with check (public.is_admin_user() or auth.uid() = user_id);
+
+drop policy if exists "dashboard attachments read own or admin" on public.dashboard_note_attachments;
+create policy "dashboard attachments read own or admin"
+on public.dashboard_note_attachments
+for select
+using (public.is_admin_user() or auth.uid() = user_id);
+
+drop policy if exists "dashboard attachments write own or admin" on public.dashboard_note_attachments;
+create policy "dashboard attachments write own or admin"
+on public.dashboard_note_attachments
+for all
+using (public.is_admin_user() or auth.uid() = user_id)
+with check (public.is_admin_user() or auth.uid() = user_id);
+
+insert into storage.buckets (id, name, public)
+values ('dashboard-note-attachments', 'dashboard-note-attachments', true)
+on conflict (id) do nothing;
+
+drop policy if exists "dashboard attachment read own or admin" on storage.objects;
+create policy "dashboard attachment read own or admin"
+on storage.objects
+for select
+using (
+  bucket_id = 'dashboard-note-attachments'
+  and (
+    public.is_admin_user()
+    or auth.uid()::text = split_part(name, '/', 1)
+  )
+);
+
+drop policy if exists "dashboard attachment write own or admin" on storage.objects;
+create policy "dashboard attachment write own or admin"
+on storage.objects
+for all
+using (
+  bucket_id = 'dashboard-note-attachments'
+  and (
+    public.is_admin_user()
+    or auth.uid()::text = split_part(name, '/', 1)
+  )
+)
+with check (
+  bucket_id = 'dashboard-note-attachments'
+  and (
+    public.is_admin_user()
+    or auth.uid()::text = split_part(name, '/', 1)
+  )
+);

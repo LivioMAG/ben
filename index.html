@@ -14,6 +14,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+    <script defer src="./notes-dashboard.js"></script>
     <script defer src="./script.js"></script>
   </head>
   <body>
@@ -217,6 +218,27 @@
                   </div>
                 </div>
                 <ul id="missingList" class="status-list"></ul>
+              </div>
+            </div>
+
+            <div id="notesDashboardPanel" class="panel notes-dashboard-panel">
+              <div class="section-heading compact">
+                <div>
+                  <h3>Notiz-Dashboard</h3>
+                  <p>Doppelklick auf freie Fläche erstellt sofort eine Notiz. Ziehen auf den Papierkorb löscht sie.</p>
+                </div>
+              </div>
+              <div id="notesDashboardCanvas" class="notes-dashboard-canvas" aria-label="Benutzer-Notizen"></div>
+              <div id="notesDashboardActionBar" class="notes-dashboard-action-bar" aria-hidden="true">
+                <button class="dashboard-action-icon trash" type="button" data-role="trash" title="Papierkorb">🗑️</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">⭐</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">📌</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🔔</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🧩</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🗂️</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🧠</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">🔒</button>
+                <button class="dashboard-action-icon" type="button" disabled title="Reserve">⚙️</button>
               </div>
             </div>
           </section>
@@ -1051,6 +1073,33 @@
           <div class="spinner" aria-hidden="true"></div>
           <strong>Bitte warten…</strong>
           <p id="loadingOverlayText">Aktion wird ausgeführt.</p>
+        </div>
+      </div>
+
+      <div id="notesDetailModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="notesDetailModalTitle">
+        <div class="modal-card panel notes-detail-modal-card">
+          <div class="modal-header">
+            <div>
+              <span class="eyebrow">Notiz</span>
+              <h3 id="notesDetailModalTitle">Detailansicht</h3>
+            </div>
+          </div>
+          <div class="notes-detail-body">
+            <label>
+              <span>Inhalt</span>
+              <textarea id="notesDetailContentInput" rows="14" placeholder="Notizinhalt"></textarea>
+            </label>
+            <label>
+              <span>Anhänge</span>
+              <input id="notesDetailAttachmentInput" type="file" multiple />
+            </label>
+            <ul id="notesDetailAttachmentsList" class="notes-detail-attachments"></ul>
+          </div>
+          <div class="modal-actions">
+            <button id="saveNotesDetailButton" class="button button-primary" type="button">Speichern</button>
+            <button id="deleteNotesDetailButton" class="button button-danger" type="button">Löschen</button>
+            <button id="closeNotesDetailButton" class="button button-secondary" type="button">Schliessen</button>
+          </div>
         </div>
       </div>
 

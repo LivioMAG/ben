@@ -937,6 +937,125 @@ tbody tr:hover {
   display: none;
 }
 
+.notes-dashboard-panel {
+  padding: 24px;
+  position: relative;
+}
+
+.notes-dashboard-canvas {
+  position: relative;
+  min-height: 520px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  border-radius: 20px;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(17, 17, 17, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 17, 17, 0.03) 1px, transparent 1px),
+    rgba(255, 255, 255, 0.7);
+  background-size: 24px 24px;
+}
+
+.dashboard-note-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 20px;
+}
+
+.dashboard-note {
+  position: absolute;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  background: #fff6a8;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.14);
+  display: grid;
+  gap: 8px;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+
+.dashboard-note.active {
+  border-color: rgba(215, 0, 21, 0.46);
+  box-shadow: 0 0 0 2px rgba(215, 0, 21, 0.12), 0 12px 26px rgba(0, 0, 0, 0.18);
+}
+
+.dashboard-note-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.25;
+  max-height: calc(1.25em * 60);
+  overflow: hidden;
+}
+
+.dashboard-note-footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.notes-dashboard-action-bar {
+  position: sticky;
+  bottom: 14px;
+  margin-top: 16px;
+  transform: translateY(120%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(17, 17, 17, 0.08);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.notes-dashboard-action-bar.visible {
+  transform: translateY(0);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.dashboard-action-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(17, 17, 17, 0.09);
+  background: #fff;
+}
+
+.dashboard-action-icon.trash {
+  color: var(--accent);
+}
+
+.notes-dashboard-action-bar.dashboard-action-bar-trash-hover .dashboard-action-icon.trash {
+  background: rgba(215, 0, 21, 0.14);
+  border-color: rgba(215, 0, 21, 0.35);
+}
+
+.notes-detail-modal-card {
+  width: min(760px, calc(100vw - 32px));
+}
+
+.notes-detail-body {
+  display: grid;
+  gap: 14px;
+}
+
+.notes-detail-attachments {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
 .adjusted-time-button {
   border: none;
   background: rgba(17, 17, 17, 0.04);
@@ -1106,6 +1225,10 @@ tbody tr:hover {
 
   .modal {
     padding: 12px;
+  }
+
+  .notes-dashboard-canvas {
+    min-height: 420px;
   }
 }
 
