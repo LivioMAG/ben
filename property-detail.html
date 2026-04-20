@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Immobilie</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./property-detail.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script defer src="./property-detail.js"></script>
+  </head>
+  <body>
+    <main class="detail-shell">
+      <header class="panel detail-header">
+        <div>
+          <span class="eyebrow">Immobilien</span>
+          <h1 id="propertyTitle">Immobilie</h1>
+          <p id="propertyMeta" class="subtle-text">–</p>
+        </div>
+        <button id="backButton" class="button" type="button">Zurück</button>
+      </header>
+
+      <section class="panel">
+        <h2>Objektinformationen</h2>
+        <dl id="propertyInfo" class="info-grid"></dl>
+      </section>
+
+      <section class="panel">
+        <h2>Dokumente</h2>
+        <div id="documentsList" class="subtle-text">Noch keine Dokumente vorhanden.</div>
+        <form id="documentForm" class="form-grid">
+          <label class="full-width">
+            <span>Neue Dokumente</span>
+            <input id="documentFileInput" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple />
+          </label>
+          <div class="full-width">
+            <button id="saveDocumentsButton" class="button" type="submit">Dokumente hochladen</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Notizen</h2>
+        <div id="alert" class="alert hidden"></div>
+        <form id="noteForm" class="form-grid">
+          <label class="full-width">
+            <span>Neue Notiz</span>
+            <textarea id="noteTextInput" rows="4" required></textarea>
+          </label>
+          <div class="full-width">
+            <button id="saveNoteButton" class="button" type="submit">Notiz speichern</button>
+          </div>
+        </form>
+        <ul id="notesList" class="notes-list"></ul>
+      </section>
+    </main>
+  </body>
+</html>
