@@ -43,23 +43,24 @@
 
           <div id="alert" class="alert hidden"></div>
 
-          <p class="board-hint">Klick auf eine Notiz oder Kategorie, um die zugehörigen Inhalte zu verwalten.</p>
+          <p class="board-hint">Direkte Bearbeitung in den Karten. Für Verlauf &amp; Details eine Notiz antippen.</p>
           <section class="kanban-board" id="kanbanBoard" aria-label="Kanban Board"></section>
         </section>
       </main>
     </div>
 
-    <div id="notesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="notesModalTitle">
-      <div id="notesModalBackdrop" class="modal-backdrop"></div>
-      <div class="modal-card">
-        <header id="notesModalHeader" class="modal-header">
-          <h2 id="notesModalTitle">Kategorie-Notizen</h2>
-          <div class="modal-actions">
-            <button id="addNoteButton" class="icon-action" type="button" title="Notiz hinzufügen" aria-label="Notiz hinzufügen">＋</button>
-            <button id="closeModalButton" class="icon-action" type="button" title="Schliessen" aria-label="Schliessen">✕</button>
-          </div>
+    <aside id="notePanel" class="slide-panel hidden" aria-label="Notiz Details">
+      <div id="notePanelBackdrop" class="slide-backdrop"></div>
+      <section class="slide-card">
+        <header class="slide-header">
+          <h2 id="panelTitle">Notiz</h2>
+          <button id="closePanelButton" class="icon-action" type="button" title="Schliessen" aria-label="Schliessen">✕</button>
         </header>
-
+        <div class="slide-tabs" role="tablist" aria-label="Notizbereiche">
+          <button type="button" class="slide-tab active" data-tab="details">Details</button>
+          <button type="button" class="slide-tab" data-tab="activity">Aktivität</button>
+          <button type="button" class="slide-tab" data-tab="documents">Dokumente</button>
+        </div>
         <form id="createNoteForm" class="create-note-form hidden">
           <label>
             Typ
@@ -93,10 +94,9 @@
             <button class="button-primary" type="submit">Notiz erstellen</button>
           </div>
         </form>
-
-        <div id="modalNotesList" class="modal-notes-list"></div>
-      </div>
-    </div>
+        <div id="panelContent" class="panel-content"></div>
+      </section>
+    </aside>
 
     <div id="documentsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="documentsModalTitle">
       <div id="documentsModalBackdrop" class="modal-backdrop"></div>
