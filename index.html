@@ -582,9 +582,12 @@
                     <input id="propertyBudgetInput" type="number" min="0" step="0.01" required />
                   </label>
                   <label>
-                    <span>Neues Dokument (JSON)</span>
-                    <textarea id="propertyDocumentInput" rows="3" placeholder='{"name":"mietvertrag.pdf","url":"/uploads/...","type":"application/pdf"}'></textarea>
+                    <span>Dokumente hochladen</span>
+                    <input id="propertyDocumentFileInput" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple />
                   </label>
+                  <div id="propertyDocumentsPreview" class="property-documents-preview subtle-text">
+                    Noch keine Dokumente vorhanden.
+                  </div>
                   <label>
                     <span>Neue Notiz *</span>
                     <textarea id="propertyNoteInput" rows="3" placeholder="Notiz erfassen (Autor wird automatisch gespeichert)."></textarea>
