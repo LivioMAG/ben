@@ -968,11 +968,12 @@ function setupNotesDashboard() {
       alert(`${message} ${error?.message ? `(${error.message})` : ''}`.trim());
     },
   });
+  state.notesDashboard.clear();
 }
 
 async function refreshNotesDashboardData() {
   if (!state.notesDashboard) return;
-  if (state.isDemoMode || !state.user || !state.hasAdminAccess) {
+  if (state.isDemoMode || !state.user) {
     state.notesDashboard.clear();
     return;
   }
