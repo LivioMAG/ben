@@ -5352,6 +5352,8 @@ async function handleProjectSubmit(event) {
     const payload = {
       commission_number: commissionNumber,
       name: selectedProperty.name || 'Unbenannte Immobilie',
+      property_id: selectedProperty.id,
+      budget: Number(selectedProperty.budget || 0),
       allow_expenses: allowExpenses,
     };
     let projectId = state.editingProjectId;
@@ -5400,7 +5402,8 @@ async function handleProjectsTableClick(event) {
     elements.projectIdInput.value = project.id;
     elements.projectCommissionInput.value = project.commission_number || '';
     if (elements.projectPropertySelect) {
-      const property = state.properties.find((item) => String(item.name || '').trim().toLowerCase() === String(project.name || '').trim().toLowerCase());
+      const property = state.properties.find((item) => String(item.id) === String(project.property_id))
+        || state.properties.find((item) => String(item.name || '').trim().toLowerCase() === String(project.name || '').trim().toLowerCase());
       elements.projectPropertySelect.value = property?.id || '';
     }
     if (elements.projectExpensesAllowedInput) {
