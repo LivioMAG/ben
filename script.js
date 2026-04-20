@@ -1512,9 +1512,15 @@ function resetAppState() {
   state.tabHiddenAt = 0;
   state.lastResumeRefreshAt = 0;
   state.pendingDataReload = false;
+  state.dispoGapProjectId = '';
   clearLoadRecoveryTimer();
   closeReportEditModal();
   closeAdjustedMinutesModal();
+  closeDispoGapSearchModal();
+  if (elements.dispoGapResults) {
+    elements.dispoGapResults.innerHTML = '';
+    elements.dispoGapResults.classList.add('hidden');
+  }
   elements.dataTimestamp.textContent = 'Noch keine Daten geladen';
 }
 
