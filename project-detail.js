@@ -18,8 +18,10 @@ const state = {
   project: null,
   notes: [],
   draggedNoteId: null,
-  activeColumnKey: null,
   activeNoteId: null,
+  activeColumnKey: null,
+  panelMode: 'note',
+  panelTab: 'details',
 };
 
 const elements = {};
@@ -54,13 +56,12 @@ function cacheElements() {
   elements.alert = document.getElementById('alert');
   elements.openDocumentsButton = document.getElementById('openDocumentsButton');
 
-  elements.modal = document.getElementById('notesModal');
-  elements.modalBackdrop = document.getElementById('notesModalBackdrop');
-  elements.modalHeader = document.getElementById('notesModalHeader');
-  elements.modalTitle = document.getElementById('notesModalTitle');
-  elements.modalNotesList = document.getElementById('modalNotesList');
-  elements.closeModalButton = document.getElementById('closeModalButton');
-  elements.addNoteButton = document.getElementById('addNoteButton');
+  elements.notePanel = document.getElementById('notePanel');
+  elements.notePanelBackdrop = document.getElementById('notePanelBackdrop');
+  elements.closePanelButton = document.getElementById('closePanelButton');
+  elements.panelTitle = document.getElementById('panelTitle');
+  elements.panelTabs = Array.from(document.querySelectorAll('.slide-tab'));
+  elements.panelContent = document.getElementById('panelContent');
 
   elements.createNoteForm = document.getElementById('createNoteForm');
   elements.newNoteType = document.getElementById('newNoteType');
@@ -90,13 +91,15 @@ function bindEvents() {
   elements.kanbanBoard?.addEventListener('dragover', handleDragOver);
   elements.kanbanBoard?.addEventListener('drop', handleDrop);
 
-  elements.closeModalButton?.addEventListener('click', closeModal);
-  elements.modalBackdrop?.addEventListener('click', closeModal);
-  elements.addNoteButton?.addEventListener('click', openCreateNoteForm);
+  elements.closePanelButton?.addEventListener('click', closePanel);
+  elements.notePanelBackdrop?.addEventListener('click', closePanel);
+  elements.panelTabs.forEach((tab) => tab.addEventListener('click', () => switchPanelTab(tab.dataset.tab)));
   elements.newNoteType?.addEventListener('change', updateCreateTypeFields);
   elements.createNoteForm?.addEventListener('submit', handleCreateNote);
-  elements.modalNotesList?.addEventListener('click', handleModalClick);
-  elements.modalNotesList?.addEventListener('change', handleModalChange);
+  elements.kanbanBoard?.addEventListener('change', handleBoardChange);
+  elements.kanbanBoard?.addEventListener('keydown', handleBoardKeydown);
+  elements.panelContent?.addEventListener('click', handlePanelClick);
+  elements.panelContent?.addEventListener('change', handlePanelChange);
 
   elements.openDocumentsButton?.addEventListener('click', openDocumentsModal);
   elements.closeDocumentsModalButton?.addEventListener('click', closeDocumentsModal);
@@ -131,8 +134,8 @@ function render() {
   const budget = Number(state.project?.budget || 0);
   elements.projectBudget.textContent = `Budget: ${budget > 0 ? formatCurrency(budget) : '–'}`;
   renderBoard();
-  if (state.activeColumnKey) {
-    renderModalNotes();
+  if (!elements.notePanel?.classList.contains('hidden')) {
+    renderPanel();
   }
   if (!elements.documentsModal?.classList.contains('hidden')) {
     renderDocumentsOverview();
@@ -148,7 +151,7 @@ function renderBoard() {
       <section class="kanban-column" data-column="${escapeAttribute(column.key)}">
         <header>
           <span>${escapeHtml(column.label)}</span>
-          <span class="count">${notes.length}</span>
+          <button type="button" class="column-add-button" data-action="add-note-column" data-column="${escapeAttribute(column.key)}" aria-label="Notiz hinzufügen">＋</button>
         </header>
         <div class="kanban-dropzone" data-column="${escapeAttribute(column.key)}">
           ${notes.length ? notes.map((note) => renderPreviewCard(note, column.key)).join('') : '<p class="column-empty">Keine Notizen</p>'}
@@ -160,38 +163,57 @@ function renderBoard() {
 
 function renderPreviewCard(note, columnKey) {
   const noteType = getNoteType(note);
-  const previewText = getPreviewText(note, noteType);
+  const previewText = getPreviewText(note, noteType, 220);
   const progress = getPreviewProgress(note, noteType);
   const attachments = normalizeAttachments(note.attachments);
-  const progressMarkup = progress ? `
-    <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${escapeAttribute(progress.percent)}">
-      <div class="preview-progress-fill" style="width:${escapeAttribute(progress.percent)}%;"></div>
+  const icon = getNoteTypeIcon(noteType);
+  const todoMarkup = noteType === 'todo' ? renderTodoPreview(note) : '';
+  const counterMarkup = noteType === 'counter' ? renderCounterPreview(note) : '';
+  const docsMarkup = attachments.length ? `
+    <div class="card-docs-strip">
+      ${attachments.slice(0, 3).map((attachment) => `<span class="doc-mini">${escapeHtml(getAttachmentVisual(attachment))}</span>`).join('')}
+      ${attachments.length > 3 ? `<span class="doc-mini">+${attachments.length - 3}</span>` : ''}
     </div>
-    <p class="note-preview-meta">${escapeHtml(progress.label)}</p>
   ` : '';
+  const metaUser = getCurrentUserName();
+  const metaTime = formatTimestamp(note.updated_at || note.created_at);
 
   return `
     <article class="note-preview note-preview-${escapeAttribute(noteType)}" draggable="true" data-note-id="${escapeAttribute(note.id)}" data-column="${escapeAttribute(note.status)}">
       <div class="note-preview-topline">
-        <span class="type-badge">${escapeHtml(getTypeLabel(noteType))}</span>
-        <span class="note-chip">${escapeHtml(getColumnMeta(columnKey).label)}</span>
+        <div class="card-type-wrap">
+          <span class="card-type-icon">${escapeHtml(icon)}</span>
+          <span class="type-badge">${escapeHtml(getTypeLabel(noteType))}</span>
+        </div>
+        <div class="card-actions-inline">
+          <button type="button" class="icon-plain" data-action="edit-note" data-note-id="${escapeAttribute(note.id)}" aria-label="Bearbeiten">✏️</button>
+          <label class="icon-plain attach-icon" aria-label="Dokument anhängen">📎
+            <input type="file" data-action="upload-attachment" data-note-id="${escapeAttribute(note.id)}" accept="${escapeAttribute(DOCUMENT_ACCEPT)}" />
+          </label>
+          <button type="button" class="icon-plain" data-action="delete-note" data-note-id="${escapeAttribute(note.id)}" aria-label="Weitere Aktionen">⋯</button>
+        </div>
       </div>
       <p class="note-preview-text">${escapeHtml(previewText)}</p>
-      ${progressMarkup}
-      <p class="note-preview-meta">${attachments.length} Dokument${attachments.length === 1 ? '' : 'e'}</p>
+      ${todoMarkup}
+      ${counterMarkup}
+      ${docsMarkup}
+      <footer class="card-footer">
+        <span>👤 ${escapeHtml(metaUser)}</span>
+        <span>🕒 ${escapeHtml(metaTime)}</span>
+      </footer>
     </article>
   `;
 }
 
-function getPreviewText(note, noteType) {
+function getPreviewText(note, noteType, max = 120) {
   if (noteType === 'todo') {
-    return truncateText(String(note.todo_description || '').trim(), 120) || 'To-do-Liste';
+    return truncateText(String(note.todo_description || '').trim(), max) || 'To-do-Liste';
   }
   if (noteType === 'counter') {
     const description = String(note.counter_description || '').trim();
-    return truncateText(description, 120) || 'Counter-Notiz';
+    return truncateText(description, max) || 'Counter-Notiz';
   }
-  return truncateText(String(note.content || '').trim(), 120) || 'Leere Notiz';
+  return truncateText(String(note.content || '').trim(), max) || 'Leere Notiz';
 }
 
 function getPreviewProgress(note, noteType) {
@@ -212,157 +234,156 @@ function getPreviewProgress(note, noteType) {
 }
 
 function handleBoardClick(event) {
-  const preview = event.target.closest('.note-preview');
-  if (preview) {
-    const columnKey = String(preview.dataset.column || '').trim();
-    if (!columnKey) return;
-    openModal(columnKey, String(preview.dataset.noteId || '').trim());
+  const addColumn = event.target.closest('[data-action="add-note-column"]');
+  if (addColumn) {
+    openCreatePanel(String(addColumn.dataset.column || '').trim());
     return;
   }
 
-  const column = event.target.closest('.kanban-column');
-  if (!column) return;
-  const columnKey = String(column.dataset.column || '').trim();
-  if (!columnKey) return;
-  openModal(columnKey);
-}
-
-function openModal(columnKey, focusNoteId = '') {
-  const columnMeta = getColumnMeta(columnKey);
-  state.activeColumnKey = columnKey;
-  state.activeNoteId = focusNoteId || null;
-  elements.modalTitle.textContent = `${columnMeta.label} – Notizen`;
-  elements.createNoteForm.classList.add('hidden');
-  elements.createNoteForm.reset();
-  updateCreateTypeFields();
-  elements.addNoteButton?.classList.toggle('hidden', Boolean(state.activeNoteId));
-  elements.modal.classList.toggle('single-note-mode', Boolean(state.activeNoteId));
-  elements.modal.classList.remove('hidden');
-  renderModalNotes();
-  if (focusNoteId) {
-    requestAnimationFrame(() => {
-      const target = elements.modalNotesList?.querySelector(`[data-note-id="${focusNoteId}"]`);
-      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    });
+  const actionButton = event.target.closest('[data-action]');
+  const action = String(actionButton?.dataset.action || '').trim();
+  const noteId = String(actionButton?.dataset.noteId || '').trim();
+  if (action === 'edit-note' && noteId) {
+    openNotePanel(noteId, 'details');
+    return;
+  }
+  if (action === 'delete-note' && noteId) {
+    deleteNote(noteId);
+    return;
+  }
+  const preview = event.target.closest('.note-preview');
+  if (preview && !action) {
+    openNotePanel(String(preview.dataset.noteId || '').trim(), 'details');
   }
 }
+function openCreatePanel(columnKey) {
+  if (!columnKey) return;
+  state.activeColumnKey = columnKey;
+  state.activeNoteId = null;
+  state.panelMode = 'create';
+  state.panelTab = 'details';
+  elements.notePanel?.classList.remove('hidden');
+  renderPanel();
+}
 
-function closeModal() {
+function openNotePanel(noteId, tab = 'details') {
+  if (!noteId) return;
+  const note = state.notes.find((entry) => String(entry.id) === String(noteId));
+  if (!note) return;
+  state.activeNoteId = noteId;
+  state.activeColumnKey = String(note.status || '').trim();
+  state.panelMode = 'note';
+  state.panelTab = tab;
+  elements.notePanel?.classList.remove('hidden');
+  renderPanel();
+}
+
+function closePanel() {
   state.activeColumnKey = null;
   state.activeNoteId = null;
-  elements.modal.classList.remove('single-note-mode');
-  elements.modal.classList.add('hidden');
+  state.panelMode = 'note';
+  state.panelTab = 'details';
+  elements.notePanel?.classList.add('hidden');
 }
 
-function renderModalNotes() {
-  if (!state.activeColumnKey || !elements.modalNotesList) return;
-  const notes = getNotesByColumn(state.activeColumnKey).filter((note) => !state.activeNoteId || String(note.id) === String(state.activeNoteId));
+function renderTodoPreview(note) {
+  const items = normalizeTodoItems(note.todo_items);
+  if (!items.length) return '<p class="note-preview-meta">Noch keine To-dos</p>';
+  return `
+    <ul class="todo-list compact">
+      ${items.slice(0, 4).map((item, index) => `
+        <li class="todo-item ${item.done ? 'done' : ''}">
+          <input type="checkbox" data-action="toggle-todo" data-note-id="${escapeAttribute(note.id)}" data-index="${index}" ${item.done ? 'checked' : ''} />
+          <span>${escapeHtml(item.text || 'Untitled')}</span>
+        </li>
+      `).join('')}
+    </ul>
+    <input type="text" class="todo-inline-input" maxlength="180" data-field="todo-input" data-note-id="${escapeAttribute(note.id)}" placeholder="To-do hinzufügen und Enter drücken" />
+  `;
+}
 
-  if (!notes.length) {
-    elements.modalNotesList.innerHTML = '<p class="modal-empty">Noch keine Notizen in dieser Kategorie.</p>';
+function renderCounterPreview(note) {
+  const target = Math.max(1, Number(note.counter_start_value ?? 1));
+  const value = Math.max(0, Number(note.counter_value ?? 0));
+  const percent = Math.min(100, Math.round((value / target) * 100));
+  return `
+    <div class="counter-main">${escapeHtml(String(value))} / ${escapeHtml(String(target))}</div>
+      <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, Math.round((value / target) * 100))}">
+        <div class="preview-progress-fill" style="width:${percent}%;"></div>
+      </div>
+      <button type="button" class="button-primary counter-plus" data-action="confirm-counter-plus" data-note-id="${escapeAttribute(note.id)}">+1 bestätigen</button>
+  `;
+}
+
+function renderPanel() {
+  if (!elements.panelContent) return;
+  const note = state.notes.find((entry) => String(entry.id) === String(state.activeNoteId));
+  const isCreate = state.panelMode === 'create';
+  elements.createNoteForm?.classList.toggle('hidden', !isCreate);
+  elements.panelTabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.tab === state.panelTab));
+  elements.panelTitle.textContent = isCreate ? `Neue Notiz · ${getColumnMeta(state.activeColumnKey).label}` : `${getTypeLabel(getNoteType(note || {}))} · ${getColumnMeta(note?.status || '').label}`;
+
+  if (isCreate) {
+    elements.panelContent.innerHTML = '<p class="modal-empty">Notiztyp wählen, Inhalte erfassen und speichern.</p>';
+    return;
+  }
+  if (!note) {
+    elements.panelContent.innerHTML = '<p class="modal-empty">Notiz nicht gefunden.</p>';
     return;
   }
 
-  elements.modalNotesList.innerHTML = notes.map((note) => renderModalNoteCard(note)).join('');
+  if (state.panelTab === 'activity') {
+    elements.panelContent.innerHTML = renderActivityTab(note);
+    return;
+  }
+  if (state.panelTab === 'documents') {
+    elements.panelContent.innerHTML = renderDocumentsTab(note);
+    return;
+  }
+  elements.panelContent.innerHTML = renderDetailsTab(note);
 }
 
-function renderModalNoteCard(note) {
-  const noteType = getNoteType(note);
-  if (noteType === 'todo') return renderTodoCard(note);
-  if (noteType === 'counter') return renderCounterCard(note);
-  return renderTextCard(note);
-}
-
-function renderTextCard(note) {
+function renderDetailsTab(note) {
+  const type = getNoteType(note);
+  if (type === 'todo') {
+    return `
+      <article class="note-card" data-note-id="${escapeAttribute(note.id)}">
+        <label>Beschreibung
+          <textarea rows="4" data-field="todo-description" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.todo_description || '')}</textarea>
+        </label>
+        <button type="button" class="button-secondary" data-action="save-todo-meta" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
+      </article>
+    `;
+  }
+  if (type === 'counter') {
+    return `
+      <article class="note-card" data-note-id="${escapeAttribute(note.id)}">
+        <label>Beschreibung
+          <textarea rows="4" data-field="counter-description" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.counter_description || '')}</textarea>
+        </label>
+        <button type="button" class="button-secondary" data-action="save-counter-meta" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
+      </article>
+    `;
+  }
   return `
-    <article class="note-card note-type-text" data-note-id="${escapeAttribute(note.id)}">
-      <header class="note-card-header">
-        <span class="type-badge">Notiz</span>
-        <div class="note-card-actions">
-          <button type="button" class="button-secondary" data-action="save-text" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
-          <button type="button" class="button-danger" data-action="delete" data-note-id="${escapeAttribute(note.id)}">Löschen</button>
-        </div>
-      </header>
+    <article class="note-card" data-note-id="${escapeAttribute(note.id)}">
       <label>Beschreibung
-        <textarea rows="5" data-field="content" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.content || '')}</textarea>
+        <textarea rows="6" data-field="content" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.content || '')}</textarea>
       </label>
-      ${renderAttachmentsSection(note)}
+      <button type="button" class="button-secondary" data-action="save-text" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
     </article>
   `;
 }
 
-function renderTodoCard(note) {
-  const items = normalizeTodoItems(note.todo_items);
-  return `
-    <article class="note-card note-type-todo" data-note-id="${escapeAttribute(note.id)}">
-      <header class="note-card-header">
-        <span class="type-badge">To-do</span>
-        <div class="note-card-actions">
-          <button type="button" class="button-secondary" data-action="save-todo-meta" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
-          <button type="button" class="button-danger" data-action="delete" data-note-id="${escapeAttribute(note.id)}">Löschen</button>
-        </div>
-      </header>
-      <label>Beschreibung (optional)
-        <textarea rows="2" data-field="todo-description" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.todo_description || '')}</textarea>
-      </label>
-      <ul class="todo-list">
-        ${items.map((item, index) => `
-          <li class="todo-item ${item.done ? 'done' : ''}">
-            <input type="checkbox" data-action="toggle-todo" data-note-id="${escapeAttribute(note.id)}" data-index="${index}" ${item.done ? 'checked' : ''} />
-            <div>
-              <span>${escapeHtml(item.text || 'Untitled')}</span>
-              ${item.done && (item.done_by_uid || item.done_by_name)
-                ? `<div class="todo-item-meta">Erledigt von ${escapeHtml(item.done_by_name || 'Unbekannt')} (${escapeHtml(item.done_by_uid || 'ohne UID')})</div>`
-                : ''}
-            </div>
-          </li>
-        `).join('')}
-      </ul>
-      <div class="inline-row">
-        <input type="text" maxlength="180" data-field="todo-input" data-note-id="${escapeAttribute(note.id)}" placeholder="To-do hinzufügen" />
-        <button type="button" class="button-primary" data-action="add-todo" data-note-id="${escapeAttribute(note.id)}">+</button>
-      </div>
-      ${renderAttachmentsSection(note)}
-    </article>
-  `;
+function renderActivityTab(note) {
+  const rows = buildActivityTimeline(note);
+  return rows.length
+    ? `<ul class="activity-list">${rows.map((row) => `<li><strong>${escapeHtml(row.user)}</strong><span>${escapeHtml(row.when)}</span><p>${escapeHtml(row.action)}</p></li>`).join('')}</ul>`
+    : '<p class="modal-empty">Noch keine Aktivitäten.</p>';
 }
 
-function renderCounterCard(note) {
-  const target = Math.max(1, Number(note.counter_start_value ?? 1));
-  const value = Math.max(0, Number(note.counter_value ?? 0));
-  const log = normalizeCounterLog(note.counter_log);
-  return `
-    <article class="note-card note-type-counter" data-note-id="${escapeAttribute(note.id)}">
-      <header class="note-card-header">
-        <span class="type-badge">Counter</span>
-        <div class="note-card-actions">
-          <button type="button" class="button-secondary" data-action="save-counter-meta" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
-          <button type="button" class="button-danger" data-action="delete" data-note-id="${escapeAttribute(note.id)}">Löschen</button>
-        </div>
-      </header>
-      <label>Beschreibung (pflichtig)
-        <textarea rows="2" data-field="counter-description" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.counter_description || '')}</textarea>
-      </label>
-      <div class="counter-status-row">
-        <div class="counter-value-block">
-          <div class="counter-value">${escapeHtml(String(value))}</div>
-          <p class="note-preview-meta">Aktueller Stand</p>
-        </div>
-        <div class="counter-value-block">
-          <div class="counter-value target">${escapeHtml(String(target))}</div>
-          <p class="note-preview-meta">Zielwert</p>
-        </div>
-      </div>
-      <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, Math.round((value / target) * 100))}">
-        <div class="preview-progress-fill" style="width:${Math.min(100, Math.round((value / target) * 100))}%;"></div>
-      </div>
-      <button type="button" class="button-primary" data-action="confirm-counter-plus" data-note-id="${escapeAttribute(note.id)}">Bestätigen</button>
-      <ul class="counter-log">
-        ${log.map((entry) => `<li>${escapeHtml(formatTimestamp(entry.timestamp))} · ${escapeHtml(entry.actor_name || 'Unbekannt')} (${escapeHtml(entry.actor_uid || 'ohne UID')})</li>`).join('') || '<li>Keine Einträge</li>'}
-      </ul>
-      ${renderAttachmentsSection(note)}
-    </article>
-  `;
+function renderDocumentsTab(note) {
+  return renderAttachmentsSection(note);
 }
 
 function renderAttachmentsSection(note) {
@@ -491,20 +512,16 @@ async function handleCreateNote(event) {
     return;
   }
 
-  openCreateNoteForm();
+  elements.createNoteForm?.reset();
+  updateCreateTypeFields();
   await loadData();
 }
 
-async function handleModalClick(event) {
+async function handlePanelClick(event) {
   const button = event.target.closest('button[data-action]');
   if (!button) return;
   const noteId = String(button.dataset.noteId || '').trim();
   if (!noteId) return;
-
-  if (button.dataset.action === 'delete') {
-    await deleteNote(noteId);
-    return;
-  }
 
   if (button.dataset.action === 'save-text') {
     await saveTextNote(noteId);
@@ -539,28 +556,14 @@ async function handleModalClick(event) {
   }
 }
 
-async function handleModalChange(event) {
+async function handlePanelChange(event) {
   const action = String(event.target.dataset.action || '').trim();
   const noteId = String(event.target.dataset.noteId || '').trim();
   if (!noteId) return;
 
   if (action === 'toggle-todo') {
     const index = Number(event.target.dataset.index);
-    const note = state.notes.find((entry) => String(entry.id) === noteId);
-    if (!note) return;
-    const items = normalizeTodoItems(note.todo_items);
-    if (!items[index]) return;
-    const isChecked = Boolean(event.target.checked);
-    items[index].done = isChecked;
-    items[index].done_by_uid = isChecked ? getCurrentUserUid() : null;
-    items[index].done_by_name = isChecked ? getCurrentUserName() : null;
-    items[index].done_at = isChecked ? new Date().toISOString() : null;
-    const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: items }).eq('id', noteId);
-    if (error) {
-      showAlert(`To-do konnte nicht aktualisiert werden: ${error.message}`, true);
-      return;
-    }
-    await loadData();
+    await toggleTodoItem(noteId, index, Boolean(event.target.checked));
     return;
   }
 
@@ -570,6 +573,52 @@ async function handleModalChange(event) {
     await uploadAttachment(noteId, file);
     event.target.value = '';
   }
+}
+
+async function toggleTodoItem(noteId, index, isChecked) {
+  const note = state.notes.find((entry) => String(entry.id) === noteId);
+  if (!note) return;
+  const items = normalizeTodoItems(note.todo_items);
+  if (!items[index]) return;
+  items[index].done = isChecked;
+  items[index].done_by_uid = isChecked ? getCurrentUserUid() : null;
+  items[index].done_by_name = isChecked ? getCurrentUserName() : null;
+  items[index].done_at = isChecked ? new Date().toISOString() : null;
+  const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: items }).eq('id', noteId);
+  if (error) {
+    showAlert(`To-do konnte nicht aktualisiert werden: ${error.message}`, true);
+    return;
+  }
+  await loadData();
+}
+
+async function handleBoardChange(event) {
+  const action = String(event.target.dataset.action || '').trim();
+  const noteId = String(event.target.dataset.noteId || '').trim();
+  if (!noteId) return;
+  if (action === 'toggle-todo') {
+    await toggleTodoItem(noteId, Number(event.target.dataset.index), Boolean(event.target.checked));
+  }
+  if (action === 'upload-attachment') {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await uploadAttachment(noteId, file);
+    event.target.value = '';
+  }
+}
+
+async function handleBoardKeydown(event) {
+  if (event.key !== 'Enter') return;
+  const input = event.target.closest('[data-field="todo-input"]');
+  if (!input) return;
+  event.preventDefault();
+  await addTodoItem(String(input.dataset.noteId || '').trim(), input);
+}
+
+function switchPanelTab(tab) {
+  if (!tab) return;
+  state.panelTab = tab;
+  renderPanel();
 }
 
 function updateCreateTypeFields() {
@@ -582,7 +631,6 @@ function updateCreateTypeFields() {
 
 function openCreateNoteForm() {
   if (!elements.createNoteForm) return;
-  elements.createNoteForm.classList.remove('hidden');
   elements.createNoteForm.reset();
   if (elements.newCounterStart) elements.newCounterStart.value = '1';
   if (elements.newNoteType) elements.newNoteType.value = 'text';
@@ -597,7 +645,7 @@ function openCreateNoteForm() {
 }
 
 async function saveTextNote(noteId) {
-  const contentInput = elements.modalNotesList.querySelector(`[data-field="content"][data-note-id="${noteId}"]`);
+  const contentInput = document.querySelector(`[data-field="content"][data-note-id="${noteId}"]`);
   const payload = {
     title: '',
     content: String(contentInput?.value || '').trim(),
@@ -616,7 +664,7 @@ async function saveTextNote(noteId) {
 }
 
 async function saveTodoMeta(noteId) {
-  const descriptionInput = elements.modalNotesList.querySelector(`[data-field="todo-description"][data-note-id="${noteId}"]`);
+  const descriptionInput = document.querySelector(`[data-field="todo-description"][data-note-id="${noteId}"]`);
   const todo_description = String(descriptionInput?.value || '').trim();
   const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_description, title: '' }).eq('id', noteId);
   if (error) {
@@ -627,8 +675,8 @@ async function saveTodoMeta(noteId) {
   await loadData();
 }
 
-async function addTodoItem(noteId) {
-  const input = elements.modalNotesList.querySelector(`[data-field="todo-input"][data-note-id="${noteId}"]`);
+async function addTodoItem(noteId, inputElement = null) {
+  const input = inputElement || document.querySelector(`[data-field="todo-input"][data-note-id="${noteId}"]`);
   const text = String(input?.value || '').trim();
   if (!text) {
     showAlert('Bitte To-do Text eingeben.', true);
@@ -649,7 +697,7 @@ async function addTodoItem(noteId) {
 }
 
 async function saveCounterMeta(noteId) {
-  const descriptionInput = elements.modalNotesList.querySelector(`[data-field="counter-description"][data-note-id="${noteId}"]`);
+  const descriptionInput = document.querySelector(`[data-field="counter-description"][data-note-id="${noteId}"]`);
   const counter_description = String(descriptionInput?.value || '').trim();
   if (!counter_description) {
     showAlert('Counter-Beschreibung ist erforderlich.', true);
@@ -883,6 +931,12 @@ function getTypeLabel(type) {
   return 'Notiz';
 }
 
+function getNoteTypeIcon(type) {
+  if (type === 'todo') return '☑️';
+  if (type === 'counter') return '🔢';
+  return '📝';
+}
+
 function getColumnMeta(columnKey) {
   return KANBAN_COLUMNS.find((column) => column.key === columnKey) || KANBAN_COLUMNS[0];
 }
@@ -949,6 +1003,39 @@ function getAttachmentTypeLabel(attachment) {
   if (type === 'image') return 'Bild';
   if (type === 'audio') return 'Audio';
   return 'PDF';
+}
+
+function getAttachmentVisual(attachment) {
+  const type = getAttachmentType(attachment);
+  if (type === 'image') return '🖼';
+  if (type === 'audio') return '🎧';
+  return '📄';
+}
+
+function buildActivityTimeline(note) {
+  const createdAt = formatTimestamp(note.created_at);
+  const rows = [{ user: note.created_by_name || 'System', when: createdAt, action: 'Notiz erstellt' }];
+  if (getNoteType(note) === 'todo') {
+    normalizeTodoItems(note.todo_items).forEach((item) => {
+      if (item.done_at) {
+        rows.unshift({
+          user: item.done_by_name || item.done_by_uid || 'Unbekannt',
+          when: formatTimestamp(item.done_at),
+          action: `To-do erledigt: ${item.text}`,
+        });
+      }
+    });
+  }
+  if (getNoteType(note) === 'counter') {
+    normalizeCounterLog(note.counter_log).forEach((entry) => {
+      rows.unshift({
+        user: entry.actor_name || entry.actor_uid || 'Unbekannt',
+        when: formatTimestamp(entry.timestamp),
+        action: 'Counter +1 bestätigt',
+      });
+    });
+  }
+  return rows;
 }
 
 function getCurrentUserUid() {
