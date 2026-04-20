@@ -538,6 +538,7 @@ create table if not exists public.project_kanban_notes (
   counter_value integer not null default 0,
   counter_description text,
   counter_log jsonb not null default '[]'::jsonb,
+  attachments jsonb not null default '[]'::jsonb,
   progress_percent smallint not null default 0 check (progress_percent between 0 and 100),
   checklist_history jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default timezone('utc', now()),
@@ -567,6 +568,9 @@ add column if not exists counter_description text;
 
 alter table public.project_kanban_notes
 add column if not exists counter_log jsonb not null default '[]'::jsonb;
+
+alter table public.project_kanban_notes
+add column if not exists attachments jsonb not null default '[]'::jsonb;
 
 create unique index if not exists projects_commission_number_idx
 on public.projects (commission_number);
@@ -823,6 +827,10 @@ insert into storage.buckets (id, name, public)
 values ('crm-note-attachments', 'crm-note-attachments', true)
 on conflict (id) do nothing;
 
+insert into storage.buckets (id, name, public)
+values ('project-kanban-attachments', 'project-kanban-attachments', true)
+on conflict (id) do nothing;
+
 drop policy if exists "weekly attachment read own or master" on storage.objects;
 drop policy if exists "weekly attachment write own or master" on storage.objects;
 drop policy if exists "authenticated attachment read" on storage.objects;
@@ -831,6 +839,8 @@ drop policy if exists "weekly attachment read own or admin" on storage.objects;
 drop policy if exists "weekly attachment write own or admin" on storage.objects;
 drop policy if exists "crm note attachment read own or admin" on storage.objects;
 drop policy if exists "crm note attachment write own or admin" on storage.objects;
+drop policy if exists "project kanban attachment read own or admin" on storage.objects;
+drop policy if exists "project kanban attachment write own or admin" on storage.objects;
 
 create policy "weekly attachment read own or admin"
 on storage.objects
@@ -884,6 +894,35 @@ using (
 )
 with check (
   bucket_id = 'crm-note-attachments'
+  and (
+    public.is_admin_user()
+    or auth.uid()::text = split_part(name, '/', 1)
+  )
+);
+
+create policy "project kanban attachment read own or admin"
+on storage.objects
+for select
+using (
+  bucket_id = 'project-kanban-attachments'
+  and (
+    public.is_admin_user()
+    or auth.uid()::text = split_part(name, '/', 1)
+  )
+);
+
+create policy "project kanban attachment write own or admin"
+on storage.objects
+for all
+using (
+  bucket_id = 'project-kanban-attachments'
+  and (
+    public.is_admin_user()
+    or auth.uid()::text = split_part(name, '/', 1)
+  )
+)
+with check (
+  bucket_id = 'project-kanban-attachments'
   and (
     public.is_admin_user()
     or auth.uid()::text = split_part(name, '/', 1)

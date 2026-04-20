@@ -35,7 +35,10 @@
               <h1 id="projectTitle">Auftrag</h1>
               <p id="projectMeta" class="project-meta"></p>
             </div>
-            <div id="projectBudget" class="budget-pill">Budget: –</div>
+            <div class="header-actions">
+              <button id="openDocumentsButton" class="button-secondary" type="button">Dokumente</button>
+              <div id="projectBudget" class="budget-pill">Budget: –</div>
+            </div>
           </header>
 
           <div id="alert" class="alert hidden"></div>
@@ -61,21 +64,17 @@
           <label>
             Typ
             <select id="newNoteType" required>
-              <option value="text">Text-Notiz</option>
+              <option value="text">Notiz</option>
               <option value="todo">To-do-Notiz</option>
               <option value="counter">Counter-Notiz</option>
             </select>
           </label>
-          <label data-type-field="text-title" data-type="text">
-            Titel (optional)
-            <input id="newNoteTitle" type="text" maxlength="160" placeholder="Titel" />
-          </label>
           <label data-type-field="text" data-type="text">
-            Inhalt
-            <textarea id="newNoteText" rows="3" placeholder="Freitext"></textarea>
+            Beschreibung
+            <textarea id="newNoteText" rows="3" placeholder="Beschreibung"></textarea>
           </label>
           <label data-type-field="todo" data-type="todo" class="hidden">
-            Beschreibung
+            Beschreibung (optional)
             <textarea id="newTodoDescription" rows="2" placeholder="Beschreibung für diese To-do-Notiz"></textarea>
           </label>
           <label data-type-field="todo" data-type="todo" class="hidden">
@@ -83,12 +82,12 @@
             <input id="newTodoItem" type="text" maxlength="180" placeholder="Ersten Punkt hinzufügen" />
           </label>
           <label data-type-field="counter" data-type="counter" class="hidden">
-            Beschreibung
+            Beschreibung (pflichtig)
             <textarea id="newCounterDescription" rows="2" placeholder="Beschreibung"></textarea>
           </label>
           <label data-type-field="counter" data-type="counter" class="hidden">
-            Startwert
-            <input id="newCounterStart" type="number" step="1" value="0" />
+            Zielwert
+            <input id="newCounterStart" type="number" step="1" value="1" min="1" />
           </label>
           <div class="form-actions">
             <button class="button-primary" type="submit">Notiz erstellen</button>
@@ -96,6 +95,19 @@
         </form>
 
         <div id="modalNotesList" class="modal-notes-list"></div>
+      </div>
+    </div>
+
+    <div id="documentsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="documentsModalTitle">
+      <div id="documentsModalBackdrop" class="modal-backdrop"></div>
+      <div class="modal-card documents-modal-card">
+        <header class="modal-header">
+          <h2 id="documentsModalTitle">Alle Dokumente</h2>
+          <div class="modal-actions">
+            <button id="closeDocumentsModalButton" class="icon-action" type="button" title="Schliessen" aria-label="Schliessen">✕</button>
+          </div>
+        </header>
+        <div id="documentsOverviewList" class="documents-overview-list"></div>
       </div>
     </div>
   </body>
