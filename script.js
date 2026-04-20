@@ -3,6 +3,7 @@ const CRM_NOTE_STORAGE_BUCKET = 'crm-note-attachments';
 const CONFIG_PATH = './supabase-config.json';
 const HOLIDAY_TABLE = 'platform_holidays';
 const NOTES_TABLE = 'notes';
+const PROPERTIES_TABLE = 'properties';
 const CRM_NOTE_TYPE = 'crm';
 const CRM_NOTE_CATEGORY_DEFAULT = 'information';
 const CRM_NOTE_RANKING_DEFAULT = 2;
@@ -622,6 +623,7 @@ const state = {
   schoolVacations: [],
   crmContacts: [],
   crmNotes: [],
+  properties: [],
   selectedCrmContactId: null,
   crmSearchQuery: '',
   crmCategoryFilter: '',
@@ -781,6 +783,7 @@ function cacheElements() {
     projectDetail: document.getElementById('projectDetailPage'),
     dispo: document.getElementById('dispoPage'),
     crm: document.getElementById('crmPage'),
+    properties: document.getElementById('propertiesPage'),
     settings: document.getElementById('settingsPage'),
   };
   elements.projectForm = document.getElementById('projectForm');
@@ -877,6 +880,20 @@ function cacheElements() {
   elements.crmNoteTargetUidInput = document.getElementById('crmNoteTargetUidInput');
   elements.crmNoteTextInput = document.getElementById('crmNoteTextInput');
   elements.crmNotesList = document.getElementById('crmNotesList');
+  elements.propertiesAlert = document.getElementById('propertiesAlert');
+  elements.propertyForm = document.getElementById('propertyForm');
+  elements.propertyIdInput = document.getElementById('propertyIdInput');
+  elements.propertyContactIdInput = document.getElementById('propertyContactIdInput');
+  elements.propertyNameInput = document.getElementById('propertyNameInput');
+  elements.propertyAddressInput = document.getElementById('propertyAddressInput');
+  elements.propertyStreetInput = document.getElementById('propertyStreetInput');
+  elements.propertyPostalCodeInput = document.getElementById('propertyPostalCodeInput');
+  elements.propertyCityInput = document.getElementById('propertyCityInput');
+  elements.propertyBudgetInput = document.getElementById('propertyBudgetInput');
+  elements.propertyNoteInput = document.getElementById('propertyNoteInput');
+  elements.propertyDocumentInput = document.getElementById('propertyDocumentInput');
+  elements.resetPropertyFormButton = document.getElementById('resetPropertyFormButton');
+  elements.propertiesTableBody = document.getElementById('propertiesTableBody');
 }
 
 function bindEvents() {
@@ -1062,6 +1079,15 @@ function bindEvents() {
         closeCrmContactModal();
       }
     });
+  }
+  if (elements.propertyForm) {
+    elements.propertyForm.addEventListener('submit', handlePropertySubmit);
+  }
+  if (elements.resetPropertyFormButton) {
+    elements.resetPropertyFormButton.addEventListener('click', resetPropertyForm);
+  }
+  if (elements.propertiesTableBody) {
+    elements.propertiesTableBody.addEventListener('click', handlePropertiesTableClick);
   }
   document.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('focus', handleWindowFocus);
@@ -1325,6 +1351,7 @@ function resetAppState() {
   state.schoolVacations = [];
   state.crmContacts = [];
   state.crmNotes = [];
+  state.properties = [];
   state.selectedCrmContactId = null;
   state.employeeFilterQuery = '';
   state.projectSearchQuery = '';
@@ -1412,6 +1439,7 @@ async function loadData() {
       state.schoolVacations = [];
       state.crmContacts = [];
       state.crmNotes = [];
+      state.properties = [];
       state.selectedCrmContactId = null;
       elements.dataTimestamp.textContent = 'Kein Zugriff – is_admin ist für dieses Profil nicht aktiviert';
       finishDataLoad(requestId);
@@ -1475,6 +1503,10 @@ async function loadData() {
       .eq('note_type', CRM_NOTE_TYPE)
       .order('created_at', { ascending: false })
       .limit(1000);
+    const propertiesQuery = state.supabase
+      .from(PROPERTIES_TABLE)
+      .select('*')
+      .order('created_at', { ascending: false });
     const [
       { data: reports, error: reportsError },
       { data: profiles, error: profilesError },
@@ -1486,6 +1518,7 @@ async function loadData() {
       { data: schoolVacations, error: schoolVacationsError },
       { data: crmContacts, error: crmContactsError },
       { data: crmNotes, error: crmNotesError },
+      { data: properties, error: propertiesError },
     ] = await Promise.all([
       reportsQuery,
       profilesQuery,
@@ -1497,6 +1530,7 @@ async function loadData() {
       schoolVacationsQuery,
       crmContactsQuery,
       crmNotesQuery,
+      propertiesQuery,
     ]);
 
     if (reportsError) throw reportsError;
@@ -1509,6 +1543,7 @@ async function loadData() {
     if (schoolVacationsError && !isMissingTableError(schoolVacationsError, 'school_vacations')) throw schoolVacationsError;
     if (crmContactsError && !isMissingTableError(crmContactsError, 'crm_contacts')) throw crmContactsError;
     if (crmNotesError && !isMissingTableError(crmNotesError, NOTES_TABLE)) throw crmNotesError;
+    if (propertiesError && !isMissingTableError(propertiesError, PROPERTIES_TABLE)) throw propertiesError;
     if (!isActiveDataLoad(requestId)) {
       return;
     }
@@ -1523,6 +1558,7 @@ async function loadData() {
     state.schoolVacations = schoolVacations ?? [];
     state.crmContacts = crmContacts ?? [];
     state.crmNotes = crmNotes ?? [];
+    state.properties = properties ?? [];
     if (state.selectedCrmContactId && !state.crmContacts.some((item) => String(item.id) === String(state.selectedCrmContactId))) {
       state.selectedCrmContactId = null;
     }
@@ -1618,6 +1654,7 @@ async function loadDemoData() {
   state.schoolVacations = [];
   state.crmContacts = [];
   state.crmNotes = [];
+  state.properties = [];
   state.selectedCrmContactId = null;
   syncEmployeeSelection();
   syncAbsenceSelection();
@@ -1674,6 +1711,8 @@ function render() {
   renderCrmContactsTable();
   renderCrmContactDetail();
   renderCrmNotesPanel();
+  renderPropertyContactOptions();
+  renderPropertiesTable();
   renderLoadingOverlay();
 }
 
@@ -1744,6 +1783,7 @@ function renderPages() {
     projectDetail: 'Projekt-Detail',
     dispo: 'Dispo / Wochenplanung',
     crm: 'CRM',
+    properties: 'Immobilien',
     settings: 'Einstellungen',
   };
 
@@ -3236,6 +3276,144 @@ async function handleCrmNoteSubmit(event) {
   }
 }
 
+function resetPropertyForm() {
+  if (elements.propertyForm) {
+    elements.propertyForm.reset();
+  }
+  if (elements.propertyIdInput) {
+    elements.propertyIdInput.value = '';
+  }
+}
+
+function parsePropertyDocumentInput(rawValue) {
+  const normalized = String(rawValue || '').trim();
+  if (!normalized) {
+    return null;
+  }
+  const parsed = JSON.parse(normalized);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Dokument muss ein JSON-Objekt sein.');
+  }
+  return {
+    ...parsed,
+    created_at: parsed.created_at || new Date().toISOString(),
+  };
+}
+
+async function handlePropertySubmit(event) {
+  event.preventDefault();
+  if (!state.supabase || state.isSavingSettings) return;
+
+  const propertyId = String(elements.propertyIdInput?.value || '').trim();
+  const contactId = String(elements.propertyContactIdInput?.value || '').trim();
+  const name = String(elements.propertyNameInput?.value || '').trim();
+  const address = String(elements.propertyAddressInput?.value || '').trim();
+  const street = String(elements.propertyStreetInput?.value || '').trim();
+  const postalCode = String(elements.propertyPostalCodeInput?.value || '').trim();
+  const city = String(elements.propertyCityInput?.value || '').trim();
+  const budgetRaw = Number(elements.propertyBudgetInput?.value || 0);
+  const noteText = String(elements.propertyNoteInput?.value || '').trim();
+  const documentRaw = String(elements.propertyDocumentInput?.value || '').trim();
+
+  if (!contactId || !name || !address || !street || !postalCode || !city || Number.isNaN(budgetRaw) || budgetRaw <= 0) {
+    showInlineAlert(elements.propertiesAlert, 'Bitte CRM-Kontakt, Name, Adresse, Strasse, PLZ, Ort und Budget korrekt ausfüllen.', true);
+    return;
+  }
+
+  const existingProperty = state.properties.find((entry) => String(entry.id) === String(propertyId));
+  const nextNotes = Array.isArray(existingProperty?.notizen) ? [...existingProperty.notizen] : [];
+  const nextDocuments = Array.isArray(existingProperty?.dokumente) ? [...existingProperty.dokumente] : [];
+
+  try {
+    if (noteText) {
+      nextNotes.push({
+        text: noteText,
+        author: getApprovalDisplayName(),
+        created_at: new Date().toISOString(),
+      });
+    }
+    const parsedDocument = parsePropertyDocumentInput(documentRaw);
+    if (parsedDocument) {
+      nextDocuments.push(parsedDocument);
+    }
+  } catch (error) {
+    showInlineAlert(elements.propertiesAlert, `Dokument konnte nicht verarbeitet werden: ${error.message}`, true);
+    return;
+  }
+
+  const payload = {
+    contact_id: contactId,
+    name,
+    adresse: address,
+    strasse: street,
+    postleitzahl: postalCode,
+    ort: city,
+    budget: budgetRaw,
+    notizen: nextNotes,
+    dokumente: nextDocuments,
+  };
+
+  state.isSavingSettings = true;
+  try {
+    const query = propertyId
+      ? state.supabase.from(PROPERTIES_TABLE).update(payload).eq('id', propertyId)
+      : state.supabase.from(PROPERTIES_TABLE).insert(payload);
+    const { error } = await query;
+    if (error) throw error;
+
+    showInlineAlert(elements.propertiesAlert, propertyId ? 'Immobilie aktualisiert.' : 'Immobilie erstellt.', false);
+    resetPropertyForm();
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    showInlineAlert(elements.propertiesAlert, `Immobilie konnte nicht gespeichert werden: ${error.message}`, true);
+  } finally {
+    state.isSavingSettings = false;
+    render();
+  }
+}
+
+async function handlePropertiesTableClick(event) {
+  if (state.isSavingSettings) return;
+  const button = event.target.closest('button[data-action]');
+  const propertyId = String(button?.dataset?.propertyId || '').trim();
+  if (!propertyId) return;
+  const property = state.properties.find((entry) => String(entry.id) === propertyId);
+  if (!property) return;
+
+  if (button.dataset.action === 'edit-property') {
+    if (elements.propertyIdInput) elements.propertyIdInput.value = property.id || '';
+    if (elements.propertyContactIdInput) elements.propertyContactIdInput.value = property.contact_id || '';
+    if (elements.propertyNameInput) elements.propertyNameInput.value = property.name || '';
+    if (elements.propertyAddressInput) elements.propertyAddressInput.value = property.adresse || '';
+    if (elements.propertyStreetInput) elements.propertyStreetInput.value = property.strasse || '';
+    if (elements.propertyPostalCodeInput) elements.propertyPostalCodeInput.value = property.postleitzahl || '';
+    if (elements.propertyCityInput) elements.propertyCityInput.value = property.ort || '';
+    if (elements.propertyBudgetInput) elements.propertyBudgetInput.value = Number(property.budget || 0).toFixed(2);
+    if (elements.propertyNoteInput) elements.propertyNoteInput.value = '';
+    if (elements.propertyDocumentInput) elements.propertyDocumentInput.value = '';
+    showInlineAlert(elements.propertiesAlert, 'Immobilie zum Bearbeiten geladen.', false);
+    return;
+  }
+
+  if (button.dataset.action === 'delete-property') {
+    if (!confirm('Immobilie wirklich löschen?')) return;
+    state.isSavingSettings = true;
+    try {
+      const { error } = await state.supabase.from(PROPERTIES_TABLE).delete().eq('id', propertyId);
+      if (error) throw error;
+      showInlineAlert(elements.propertiesAlert, 'Immobilie gelöscht.', false);
+      await loadData();
+    } catch (error) {
+      console.error(error);
+      showInlineAlert(elements.propertiesAlert, `Immobilie konnte nicht gelöscht werden: ${error.message}`, true);
+    } finally {
+      state.isSavingSettings = false;
+      render();
+    }
+  }
+}
+
 async function handleConfirmReport(reportId) {
   if (!reportId || state.isSavingReport) {
     return;
@@ -4169,6 +4347,57 @@ function renderCrmContactDetail() {
       <dt>E-Mail</dt><dd>${escapeHtml(selectedContact.email || '—')}</dd>
     </dl>
   `;
+}
+
+function getCrmContactDisplayName(contact) {
+  if (!contact) return '–';
+  const fullName = [contact.first_name, contact.last_name].filter(Boolean).join(' ').trim();
+  if (contact.company_name && fullName) {
+    return `${contact.company_name} (${fullName})`;
+  }
+  return contact.company_name || fullName || '–';
+}
+
+function renderPropertyContactOptions() {
+  if (!elements.propertyContactIdInput) return;
+  const currentValue = String(elements.propertyContactIdInput.value || '');
+  const options = state.crmContacts
+    .map((contact) => `<option value="${escapeAttribute(contact.id)}">${escapeHtml(getCrmContactDisplayName(contact))}</option>`)
+    .join('');
+  elements.propertyContactIdInput.innerHTML = `<option value="">Kontakt wählen …</option>${options}`;
+  if (currentValue && state.crmContacts.some((contact) => String(contact.id) === currentValue)) {
+    elements.propertyContactIdInput.value = currentValue;
+  }
+}
+
+function renderPropertiesTable() {
+  if (!elements.propertiesTableBody) return;
+  if (!state.properties.length) {
+    elements.propertiesTableBody.innerHTML = '<tr><td colspan="7">Noch keine Immobilien erfasst.</td></tr>';
+    return;
+  }
+
+  elements.propertiesTableBody.innerHTML = state.properties.map((property) => {
+    const linkedContact = state.crmContacts.find((contact) => String(contact.id) === String(property.contact_id));
+    const notes = Array.isArray(property.notizen) ? property.notizen : [];
+    const documents = Array.isArray(property.dokumente) ? property.dokumente : [];
+    const latestNote = notes.at(-1);
+
+    return `<tr>
+      <td>${escapeHtml(property.name || '–')}</td>
+      <td>${escapeHtml(getCrmContactDisplayName(linkedContact))}</td>
+      <td>${escapeHtml(property.adresse || '–')}</td>
+      <td>${escapeHtml(formatCurrency(Number(property.budget || 0)))}</td>
+      <td>${latestNote ? `${escapeHtml(String(latestNote.text || ''))}<br><span class="subtle-text">${escapeHtml(String(latestNote.author || 'Unbekannt'))}</span>` : '<span class="subtle-text">Keine Notiz</span>'}</td>
+      <td>${documents.length}</td>
+      <td>
+        <div class="table-actions">
+          <button class="button button-small button-secondary" type="button" data-action="edit-property" data-property-id="${escapeAttribute(property.id)}">Bearbeiten</button>
+          <button class="button button-small button-danger" type="button" data-action="delete-property" data-property-id="${escapeAttribute(property.id)}">Löschen</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 function openCrmContactModal(contact = null) {
