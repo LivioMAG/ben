@@ -37,12 +37,15 @@ body {
 .nav-icon-button.active { background: rgba(17, 17, 17, 0.1); border-color: rgba(17, 17, 17, 0.12); color: #111; }
 .icon { font-size: 20px; line-height: 1; }
 
-.detail-content { padding: 16px; }
+.detail-content { padding: 16px; min-height: 100vh; }
 .detail-panel {
   background: #fff;
   border: 1px solid rgba(17,17,17,0.08);
   border-radius: 14px;
   padding: 16px;
+  height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
 }
 .detail-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 12px; }
 .detail-header h1 { margin: 0; font-size: 24px; }
@@ -69,14 +72,17 @@ body {
   gap: 12px;
   overflow-x: auto;
   padding-bottom: 6px;
+  flex: 1;
+  min-height: 0;
 }
 .kanban-column {
   background: #f8f9fb;
   border: 1px solid rgba(17,17,17,0.08);
   border-radius: 14px;
-  min-height: 430px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 .kanban-column > header {
   display: flex;
@@ -86,28 +92,43 @@ body {
   border-bottom: 1px solid rgba(17,17,17,0.08);
 }
 .count { color: rgba(17,17,17,0.5); }
-.kanban-dropzone { padding: 10px; display: grid; gap: 10px; flex: 1; }
+.kanban-dropzone { padding: 10px; display: grid; gap: 8px; flex: 1; align-content: start; overflow-y: auto; min-height: 0; }
 .column-empty { margin: 0; color: rgba(17,17,17,0.45); font-size: 13px; }
 
 .note-preview {
   background: #fff;
   border: 1px solid rgba(17,17,17,0.1);
   border-radius: 12px;
-  padding: 10px;
-  display: grid;
-  gap: 6px;
+  padding: 6px 8px;
+  min-height: 50px;
+  max-height: 50px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   cursor: grab;
+  overflow: hidden;
 }
 .note-preview.dragging { opacity: 0.45; }
-.note-preview-title { margin: 0; font-size: 14px; font-weight: 700; }
-.note-preview-text { margin: 0; font-size: 13px; color: rgba(17,17,17,0.68); }
+.note-preview-title { margin: 0; font-size: 13px; font-weight: 700; line-height: 1.2; }
+.note-preview-text {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(17,17,17,0.68);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
 .note-preview-meta { margin: 0; font-size: 12px; color: rgba(17,17,17,0.52); }
 .preview-progress {
   width: 100%;
-  height: 8px;
+  height: 6px;
   border-radius: 999px;
   overflow: hidden;
   background: rgba(17, 17, 17, 0.12);
+  margin-top: auto;
 }
 .preview-progress-fill {
   height: 100%;
@@ -139,7 +160,7 @@ body {
 }
 .modal-card {
   position: relative;
-  width: min(980px, calc(100vw - 48px));
+  width: min(760px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);
   overflow: auto;
   background: #fff;
@@ -191,8 +212,11 @@ body {
 .modal-notes-list {
   margin-top: 14px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
+}
+.modal.single-note-mode .modal-card {
+  width: min(560px, calc(100vw - 48px));
 }
 .modal-empty {
   grid-column: 1 / -1;
@@ -221,6 +245,10 @@ body {
 .todo-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .todo-item { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .todo-item.done span { text-decoration: line-through; opacity: 0.6; }
+.todo-item-meta {
+  font-size: 11px;
+  color: rgba(17,17,17,0.55);
+}
 .inline-row { display: flex; gap: 6px; }
 .inline-row input { flex: 1; }
 .counter-value { font-size: 30px; font-weight: 800; line-height: 1; margin: 2px 0; }

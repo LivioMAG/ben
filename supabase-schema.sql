@@ -532,6 +532,7 @@ create table if not exists public.project_kanban_notes (
   content text not null,
   note_type text not null default 'text' check (note_type in ('text', 'todo', 'counter')),
   title text,
+  todo_description text,
   todo_items jsonb not null default '[]'::jsonb,
   counter_start_value integer not null default 0,
   counter_value integer not null default 0,
@@ -548,6 +549,9 @@ add column if not exists note_type text not null default 'text' check (note_type
 
 alter table public.project_kanban_notes
 add column if not exists title text;
+
+alter table public.project_kanban_notes
+add column if not exists todo_description text;
 
 alter table public.project_kanban_notes
 add column if not exists todo_items jsonb not null default '[]'::jsonb;

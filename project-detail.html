@@ -66,7 +66,7 @@
               <option value="counter">Counter-Notiz</option>
             </select>
           </label>
-          <label>
+          <label data-type-field="text-title" data-type="text">
             Titel (optional)
             <input id="newNoteTitle" type="text" maxlength="160" placeholder="Titel" />
           </label>
@@ -75,11 +75,15 @@
             <textarea id="newNoteText" rows="3" placeholder="Freitext"></textarea>
           </label>
           <label data-type-field="todo" data-type="todo" class="hidden">
+            Beschreibung
+            <textarea id="newTodoDescription" rows="2" placeholder="Beschreibung für diese To-do-Notiz"></textarea>
+          </label>
+          <label data-type-field="todo" data-type="todo" class="hidden">
             Erstes To-do (optional)
-            <input id="newTodoItem" type="text" maxlength="180" placeholder="To-do hinzufügen" />
+            <input id="newTodoItem" type="text" maxlength="180" placeholder="Ersten Punkt hinzufügen" />
           </label>
           <label data-type-field="counter" data-type="counter" class="hidden">
-            Beschreibung (optional)
+            Beschreibung
             <textarea id="newCounterDescription" rows="2" placeholder="Beschreibung"></textarea>
           </label>
           <label data-type-field="counter" data-type="counter" class="hidden">
