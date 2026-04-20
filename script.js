@@ -791,9 +791,7 @@ function cacheElements() {
   elements.projectForm = document.getElementById('projectForm');
   elements.projectIdInput = document.getElementById('projectIdInput');
   elements.projectCommissionInput = document.getElementById('projectCommissionInput');
-  elements.projectNameInput = document.getElementById('projectNameInput');
-  elements.projectLeadSelect = document.getElementById('projectLeadSelect');
-  elements.constructionLeadSelect = document.getElementById('constructionLeadSelect');
+  elements.projectPropertySelect = document.getElementById('projectPropertySelect');
   elements.projectExpensesAllowedInput = document.getElementById('projectExpensesAllowedInput');
   elements.projectSearchInput = document.getElementById('projectSearchInput');
   elements.projectsTableBody = document.getElementById('projectsTableBody');
@@ -4765,32 +4763,27 @@ function renderSettingsSchoolVacationsTable() {
 }
 
 function renderProjectForm() {
-  if (!elements.projectLeadSelect) return;
+  if (!elements.projectPropertySelect) return;
+  const properties = [...state.properties].sort((left, right) => String(left.name || '').localeCompare(String(right.name || ''), 'de'));
   const options = [`<option value="">Bitte wählen</option>`]
-    .concat(
-      getActiveProfiles().map((profile) => `<option value="${escapeAttribute(profile.id)}">${escapeHtml(profile.full_name || profile.email || 'Unbekannt')}</option>`)
-    )
+    .concat(properties.map((property) => `<option value="${escapeAttribute(property.id)}">${escapeHtml(property.name || 'Unbenannte Immobilie')}</option>`))
     .join('');
-  elements.projectLeadSelect.innerHTML = options;
-  elements.constructionLeadSelect.innerHTML = options;
+  elements.projectPropertySelect.innerHTML = options;
 }
 
 function renderProjectsTable() {
   if (!elements.projectsTableBody) return;
   const rows = getFilteredProjects();
   if (!rows.length) {
-    elements.projectsTableBody.innerHTML = '<tr><td colspan="6" class="empty-state">Keine Projekte vorhanden.</td></tr>';
+    elements.projectsTableBody.innerHTML = '<tr><td colspan="5" class="empty-state">Keine Aufträge vorhanden.</td></tr>';
     return;
   }
   elements.projectsTableBody.innerHTML = rows.map((project) => {
-    const assignments = getProjectRoleAssignments(project.id);
-    const projectLead = getProfileById(assignments.projectLeadId)?.full_name || '—';
-    const constructionLead = getProfileById(assignments.constructionLeadId)?.full_name || '—';
+    const terminated = project.terminated_at || project.is_terminated ? 'Ja' : 'Nein';
     return `<tr class="project-row-clickable" data-action="open-project-detail" data-project-id="${escapeAttribute(project.id)}">
+      <td>${escapeHtml(project.name || '—')}</td>
       <td>${escapeHtml(project.commission_number || '')}</td>
-      <td>${escapeHtml(project.name || '')}</td>
-      <td>${escapeHtml(projectLead)}</td>
-      <td>${escapeHtml(constructionLead)}</td>
+      <td>${escapeHtml(terminated)}</td>
       <td><span class="pill ${project.allow_expenses === false ? 'warning' : 'success'}">${project.allow_expenses === false ? 'Nein' : 'Ja'}</span></td>
       <td>
         <div class="table-row-actions">
@@ -5327,12 +5320,13 @@ function getFilteredProjects() {
   return state.projects.filter((project) => String(project.commission_number || '').toLowerCase().includes(query) || String(project.name || '').toLowerCase().includes(query));
 }
 
-function getProjectRoleAssignments(projectId) {
-  const project = state.projects.find((item) => item.id === projectId);
-  return {
-    projectLeadId: project?.project_lead_profile_id || '',
-    constructionLeadId: project?.construction_lead_profile_id || '',
-  };
+function generateUniqueCommissionNumber() {
+  const existing = new Set(state.projects.map((project) => String(project.commission_number || '').trim()).filter(Boolean));
+  let value = '';
+  do {
+    value = `K-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 90 + 10)}`;
+  } while (existing.has(value));
+  return value;
 }
 
 function handleProjectSearchInput(event) {
@@ -5342,25 +5336,22 @@ function handleProjectSearchInput(event) {
 
 async function handleProjectSubmit(event) {
   event.preventDefault();
+  const propertyId = String(elements.projectPropertySelect?.value || '').trim();
   const commissionNumber = elements.projectCommissionInput.value.trim();
-  const name = elements.projectNameInput.value.trim();
-  const projectLeadId = elements.projectLeadSelect.value;
-  const constructionLeadId = elements.constructionLeadSelect.value;
   const allowExpenses = elements.projectExpensesAllowedInput?.checked !== false;
-  if (!commissionNumber || !name || !projectLeadId || !constructionLeadId) {
-    showInlineAlert(elements.projectsAlert, 'Kommissionsnummer, Projektname, Projektleiter und Bauleiter sind Pflicht.', true);
+  if (!propertyId || !commissionNumber) {
+    showInlineAlert(elements.projectsAlert, 'Immobilie und Kommissionsnummer sind Pflicht.', true);
     return;
   }
-  if (projectLeadId === constructionLeadId) {
-    showInlineAlert(elements.projectsAlert, 'Projektleiter und Bauleiter müssen unterschiedliche Personen sein.', true);
+  const selectedProperty = state.properties.find((item) => String(item.id) === propertyId);
+  if (!selectedProperty) {
+    showInlineAlert(elements.projectsAlert, 'Die gewählte Immobilie wurde nicht gefunden.', true);
     return;
   }
-  await withLongTask('Projekt wird gespeichert …', async () => {
+  await withLongTask('Auftrag wird gespeichert …', async () => {
     const payload = {
       commission_number: commissionNumber,
-      name,
-      project_lead_profile_id: projectLeadId,
-      construction_lead_profile_id: constructionLeadId,
+      name: selectedProperty.name || 'Unbenannte Immobilie',
       allow_expenses: allowExpenses,
     };
     let projectId = state.editingProjectId;
@@ -5374,7 +5365,7 @@ async function handleProjectSubmit(event) {
     }
     resetProjectForm();
     closeProjectModal();
-    showInlineAlert(elements.projectsAlert, 'Projekt erfolgreich gespeichert.', false);
+    showInlineAlert(elements.projectsAlert, 'Auftrag erfolgreich gespeichert.', false);
     await loadData();
   });
 }
@@ -5382,10 +5373,10 @@ async function handleProjectSubmit(event) {
 function resetProjectForm() {
   state.editingProjectId = null;
   elements.projectIdInput.value = '';
-  elements.projectCommissionInput.value = '';
-  elements.projectNameInput.value = '';
-  elements.projectLeadSelect.value = '';
-  elements.constructionLeadSelect.value = '';
+  if (elements.projectPropertySelect) {
+    elements.projectPropertySelect.value = '';
+  }
+  elements.projectCommissionInput.value = generateUniqueCommissionNumber();
   if (elements.projectExpensesAllowedInput) {
     elements.projectExpensesAllowedInput.checked = true;
   }
@@ -5405,13 +5396,13 @@ async function handleProjectsTableClick(event) {
   if (action === 'edit-project') {
     const project = state.projects.find((item) => String(item.id) === String(projectId));
     if (!project) return;
-    const roles = getProjectRoleAssignments(project.id);
     state.editingProjectId = project.id;
     elements.projectIdInput.value = project.id;
     elements.projectCommissionInput.value = project.commission_number || '';
-    elements.projectNameInput.value = project.name || '';
-    elements.projectLeadSelect.value = roles.projectLeadId;
-    elements.constructionLeadSelect.value = roles.constructionLeadId;
+    if (elements.projectPropertySelect) {
+      const property = state.properties.find((item) => String(item.name || '').trim().toLowerCase() === String(project.name || '').trim().toLowerCase());
+      elements.projectPropertySelect.value = property?.id || '';
+    }
     if (elements.projectExpensesAllowedInput) {
       elements.projectExpensesAllowedInput.checked = project.allow_expenses !== false;
     }
@@ -5432,6 +5423,9 @@ async function handleProjectsTableClick(event) {
 
 function openProjectModal() {
   if (!elements.projectModal) return;
+  if (!state.editingProjectId) {
+    resetProjectForm();
+  }
   elements.projectModal.classList.remove('hidden');
 }
 
