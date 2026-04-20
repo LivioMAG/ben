@@ -236,7 +236,6 @@ security definer
 set search_path = public
 as $$
 declare
-  current_request public.holiday_requests%rowtype;
   updated_request public.holiday_requests%rowtype;
   archive_context text;
 begin
@@ -244,8 +243,7 @@ begin
     raise exception 'Ungültiges Freigabefeld: %', p_field_name;
   end if;
 
-  select *
-  into current_request
+  perform 1
   from public.holiday_requests
   where id = p_request_id
   for update;
