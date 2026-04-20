@@ -791,6 +791,7 @@ function cacheElements() {
   elements.loadingOverlay = document.getElementById('loadingOverlay');
   elements.loadingOverlayText = document.getElementById('loadingOverlayText');
   elements.pages = {
+    dashboard: document.getElementById('dashboardPage'),
     reports: document.getElementById('reportsPage'),
     absences: document.getElementById('absencesPage'),
     saldo: document.getElementById('saldoPage'),
@@ -1949,6 +1950,7 @@ async function withLongTask(reason, task) {
 
 function renderPages() {
   const pageTitles = {
+    dashboard: 'Dashboard',
     reports: 'Wochenrapporte',
     absences: 'Ferien & Absenzen',
     saldo: 'Saldo',
