@@ -941,38 +941,21 @@ tbody tr:hover {
 .notes-dashboard-panel {
   padding: 12px;
   position: relative;
-  min-height: clamp(520px, 72vh, 980px);
-  height: auto;
+  min-height: calc(100vh - 52px);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  overflow: visible;
 }
 
 .notes-dashboard-canvas {
   position: relative;
-  min-height: clamp(420px, 62vh, 900px);
-  height: 100%;
+  min-height: 100%;
   border: 1px solid rgba(17, 17, 17, 0.08);
   border-radius: 18px;
   overflow: hidden;
-  background-color: rgba(255, 255, 255, 0.78);
   background:
-    repeating-linear-gradient(
-      0deg,
-      rgba(17, 17, 17, 0.06) 0,
-      rgba(17, 17, 17, 0.06) 1px,
-      transparent 1px,
-      transparent 8px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      rgba(17, 17, 17, 0.06) 0,
-      rgba(17, 17, 17, 0.06) 1px,
-      transparent 1px,
-      transparent 8px
-    ),
-    rgba(255, 255, 255, 0.78);
-  background-size: 8px 8px;
+    linear-gradient(rgba(17, 17, 17, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 17, 17, 0.03) 1px, transparent 1px),
+    rgba(255, 255, 255, 0.7);
+  background-size: 24px 24px;
 }
 
 .dashboard-note-empty {
@@ -986,17 +969,17 @@ tbody tr:hover {
 
 .dashboard-note {
   position: absolute;
-  padding: 6px;
-  border-radius: 8px;
+  padding: 8px;
+  border-radius: 10px;
   border: 1px solid rgba(17, 17, 17, 0.1);
   background: #fff6a8;
-  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.13);
   display: grid;
-  gap: 2px;
+  gap: 4px;
   overflow: hidden;
   touch-action: none;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: transform 0.28s ease, box-shadow 0.28s ease;
   transform-origin: center;
 }
 
@@ -1008,9 +991,9 @@ tbody tr:hover {
 .dashboard-note-content {
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.15;
-  font-size: 10px;
-  max-height: calc(1.15em * 4);
+  line-height: 1.2;
+  font-size: 12px;
+  max-height: calc(1.2em * 5);
   overflow: hidden;
 }
 
@@ -1018,8 +1001,8 @@ tbody tr:hover {
   margin-top: auto;
   display: flex;
   justify-content: space-between;
-  gap: 6px;
-  font-size: 9px;
+  gap: 10px;
+  font-size: 10px;
   color: var(--muted);
 }
 
@@ -1037,8 +1020,8 @@ tbody tr:hover {
 }
 
 .dashboard-note.is-expanded {
-  transform: scale(2.5);
-  z-index: 24;
+  transform: scale(1.75);
+  z-index: 16;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.26);
 }
 
@@ -1061,7 +1044,6 @@ tbody tr:hover {
   border-radius: 18px;
   border: 1px solid rgba(17, 17, 17, 0.08);
   background: rgba(255, 255, 255, 0.95);
-  z-index: 40;
 }
 
 .notes-dashboard-action-bar.visible {
@@ -1093,37 +1075,14 @@ tbody tr:hover {
 
 #appView.dashboard-minimal .content-area {
   gap: 0;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  padding-bottom: 0;
 }
 
 #appView.dashboard-minimal #dashboardPage {
-  min-height: 0;
-  height: 100%;
-  overflow: hidden;
-  gap: 0;
+  min-height: calc(100vh - 40px);
 }
 
 #appView.dashboard-minimal #notesDashboardPanel .section-heading {
   display: none;
-}
-
-#appView.dashboard-minimal {
-  height: calc(100vh - 40px);
-  overflow: hidden;
-}
-
-#appView.dashboard-minimal #notesDashboardPanel {
-  margin: 0;
-  min-height: 0;
-  height: 100%;
-  grid-template-rows: minmax(0, 1fr) auto;
-}
-
-#appView.dashboard-minimal #notesDashboardPanel .notes-dashboard-canvas {
-  min-height: 0;
 }
 
 .notes-detail-modal-card {
