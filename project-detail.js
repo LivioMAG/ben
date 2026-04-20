@@ -1,8 +1,10 @@
 const CONFIG_PATH = './supabase-config.json';
 const KANBAN_TABLE = 'project_kanban_notes';
 const PROJECTS_TABLE = 'projects';
+const ATTACHMENTS_BUCKET = 'project-kanban-attachments';
+const DOCUMENT_ACCEPT = 'application/pdf,image/*,audio/*';
 const KANBAN_COLUMNS = [
-  { key: 'todo', label: 'To-Do' },
+  { key: 'todo', label: 'To-dos' },
   { key: 'planned', label: 'Geplant' },
   { key: 'in_progress', label: 'In Bearbeitung' },
   { key: 'review', label: 'AI' },
@@ -50,6 +52,7 @@ function cacheElements() {
   elements.projectBudget = document.getElementById('projectBudget');
   elements.kanbanBoard = document.getElementById('kanbanBoard');
   elements.alert = document.getElementById('alert');
+  elements.openDocumentsButton = document.getElementById('openDocumentsButton');
 
   elements.modal = document.getElementById('notesModal');
   elements.modalBackdrop = document.getElementById('notesModalBackdrop');
@@ -61,12 +64,16 @@ function cacheElements() {
 
   elements.createNoteForm = document.getElementById('createNoteForm');
   elements.newNoteType = document.getElementById('newNoteType');
-  elements.newNoteTitle = document.getElementById('newNoteTitle');
   elements.newNoteText = document.getElementById('newNoteText');
   elements.newTodoDescription = document.getElementById('newTodoDescription');
   elements.newTodoItem = document.getElementById('newTodoItem');
   elements.newCounterDescription = document.getElementById('newCounterDescription');
   elements.newCounterStart = document.getElementById('newCounterStart');
+
+  elements.documentsModal = document.getElementById('documentsModal');
+  elements.documentsModalBackdrop = document.getElementById('documentsModalBackdrop');
+  elements.closeDocumentsModalButton = document.getElementById('closeDocumentsModalButton');
+  elements.documentsOverviewList = document.getElementById('documentsOverviewList');
 }
 
 function bindEvents() {
@@ -90,6 +97,10 @@ function bindEvents() {
   elements.createNoteForm?.addEventListener('submit', handleCreateNote);
   elements.modalNotesList?.addEventListener('click', handleModalClick);
   elements.modalNotesList?.addEventListener('change', handleModalChange);
+
+  elements.openDocumentsButton?.addEventListener('click', openDocumentsModal);
+  elements.closeDocumentsModalButton?.addEventListener('click', closeDocumentsModal);
+  elements.documentsModalBackdrop?.addEventListener('click', closeDocumentsModal);
 }
 
 async function initializeSupabase() {
@@ -123,6 +134,9 @@ function render() {
   if (state.activeColumnKey) {
     renderModalNotes();
   }
+  if (!elements.documentsModal?.classList.contains('hidden')) {
+    renderDocumentsOverview();
+  }
 }
 
 function renderBoard() {
@@ -137,59 +151,62 @@ function renderBoard() {
           <span class="count">${notes.length}</span>
         </header>
         <div class="kanban-dropzone" data-column="${escapeAttribute(column.key)}">
-          ${notes.length ? notes.map((note) => renderPreviewCard(note)).join('') : '<p class="column-empty">Keine Notizen</p>'}
+          ${notes.length ? notes.map((note) => renderPreviewCard(note, column.key)).join('') : '<p class="column-empty">Keine Notizen</p>'}
         </div>
       </section>
     `;
   }).join('');
 }
 
-function renderPreviewCard(note) {
+function renderPreviewCard(note, columnKey) {
   const noteType = getNoteType(note);
-  const title = String(note.title || '').trim();
   const previewText = getPreviewText(note, noteType);
   const progress = getPreviewProgress(note, noteType);
-  const titleMarkup = title ? `<h3 class="note-preview-title">${escapeHtml(title)}</h3>` : '';
-  const progressMarkup = progress?.percent > 0 || noteType === 'todo' || noteType === 'counter' ? `
+  const attachments = normalizeAttachments(note.attachments);
+  const progressMarkup = progress ? `
     <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${escapeAttribute(progress.percent)}">
       <div class="preview-progress-fill" style="width:${escapeAttribute(progress.percent)}%;"></div>
     </div>
+    <p class="note-preview-meta">${escapeHtml(progress.label)}</p>
   ` : '';
+
   return `
-    <article class="note-preview" draggable="true" data-note-id="${escapeAttribute(note.id)}" data-column="${escapeAttribute(note.status)}">
-      ${titleMarkup}
+    <article class="note-preview note-preview-${escapeAttribute(noteType)}" draggable="true" data-note-id="${escapeAttribute(note.id)}" data-column="${escapeAttribute(note.status)}">
+      <div class="note-preview-topline">
+        <span class="type-badge">${escapeHtml(getTypeLabel(noteType))}</span>
+        <span class="note-chip">${escapeHtml(getColumnMeta(columnKey).label)}</span>
+      </div>
       <p class="note-preview-text">${escapeHtml(previewText)}</p>
       ${progressMarkup}
+      <p class="note-preview-meta">${attachments.length} Dokument${attachments.length === 1 ? '' : 'e'}</p>
     </article>
   `;
 }
 
 function getPreviewText(note, noteType) {
   if (noteType === 'todo') {
-    return truncateText(String(note.todo_description || '').trim(), 90) || 'To-do-Notiz';
+    return truncateText(String(note.todo_description || '').trim(), 120) || 'To-do-Liste';
   }
   if (noteType === 'counter') {
     const description = String(note.counter_description || '').trim();
-    if (description) return truncateText(description, 90);
-    return 'Counter-Notiz';
+    return truncateText(description, 120) || 'Counter-Notiz';
   }
-  return truncateText(String(note.content || '').trim(), 90) || 'Kein Inhalt';
+  return truncateText(String(note.content || '').trim(), 120) || 'Leere Notiz';
 }
 
 function getPreviewProgress(note, noteType) {
   if (noteType === 'todo') {
     const items = normalizeTodoItems(note.todo_items);
-    if (!items.length) return { percent: 0 };
     const done = items.filter((item) => item.done).length;
-    const percent = Math.round((done / items.length) * 100);
-    return { percent };
+    const total = items.length;
+    const percent = total ? Math.round((done / total) * 100) : 0;
+    return { percent, label: `${done}/${total} erledigt` };
   }
   if (noteType === 'counter') {
-    const start = Math.max(0, Number(note.counter_start_value ?? 0));
+    const target = Math.max(1, Number(note.counter_start_value ?? 1));
     const current = Math.max(0, Number(note.counter_value ?? 0));
-    const completed = start > 0 ? Math.min(start, Math.max(0, start - current)) : 0;
-    const percent = start > 0 ? Math.round((completed / start) * 100) : 0;
-    return { percent };
+    const percent = Math.min(100, Math.round((current / target) * 100));
+    return { percent, label: `${current}/${target} Bestätigungen` };
   }
   return null;
 }
@@ -260,18 +277,16 @@ function renderTextCard(note) {
   return `
     <article class="note-card note-type-text" data-note-id="${escapeAttribute(note.id)}">
       <header class="note-card-header">
-        <span class="type-badge">Text</span>
+        <span class="type-badge">Notiz</span>
         <div class="note-card-actions">
           <button type="button" class="button-secondary" data-action="save-text" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
           <button type="button" class="button-danger" data-action="delete" data-note-id="${escapeAttribute(note.id)}">Löschen</button>
         </div>
       </header>
-      <label>Titel (optional)
-        <input type="text" data-field="title" data-note-id="${escapeAttribute(note.id)}" value="${escapeAttribute(note.title || '')}" />
-      </label>
-      <label>Inhalt
+      <label>Beschreibung
         <textarea rows="5" data-field="content" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.content || '')}</textarea>
       </label>
+      ${renderAttachmentsSection(note)}
     </article>
   `;
 }
@@ -287,7 +302,7 @@ function renderTodoCard(note) {
           <button type="button" class="button-danger" data-action="delete" data-note-id="${escapeAttribute(note.id)}">Löschen</button>
         </div>
       </header>
-      <label>Beschreibung
+      <label>Beschreibung (optional)
         <textarea rows="2" data-field="todo-description" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.todo_description || '')}</textarea>
       </label>
       <ul class="todo-list">
@@ -307,12 +322,14 @@ function renderTodoCard(note) {
         <input type="text" maxlength="180" data-field="todo-input" data-note-id="${escapeAttribute(note.id)}" placeholder="To-do hinzufügen" />
         <button type="button" class="button-primary" data-action="add-todo" data-note-id="${escapeAttribute(note.id)}">+</button>
       </div>
+      ${renderAttachmentsSection(note)}
     </article>
   `;
 }
 
 function renderCounterCard(note) {
-  const value = Number(note.counter_value ?? note.counter_start_value ?? 0);
+  const target = Math.max(1, Number(note.counter_start_value ?? 1));
+  const value = Math.max(0, Number(note.counter_value ?? 0));
   const log = normalizeCounterLog(note.counter_log);
   return `
     <article class="note-card note-type-counter" data-note-id="${escapeAttribute(note.id)}">
@@ -323,18 +340,98 @@ function renderCounterCard(note) {
           <button type="button" class="button-danger" data-action="delete" data-note-id="${escapeAttribute(note.id)}">Löschen</button>
         </div>
       </header>
-      <label>Beschreibung
+      <label>Beschreibung (pflichtig)
         <textarea rows="2" data-field="counter-description" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.counter_description || '')}</textarea>
       </label>
-      <div class="counter-value">${escapeHtml(String(value))}</div>
-      <button type="button" class="button-secondary" data-action="open-counter-comment" data-note-id="${escapeAttribute(note.id)}">-1</button>
-      <div class="counter-comment-box hidden" data-counter-box="${escapeAttribute(note.id)}">
-        <p class="note-preview-meta">Es wird nur der Zeitstempel gesetzt.</p>
-        <button type="button" class="button-primary" data-action="confirm-counter-minus" data-note-id="${escapeAttribute(note.id)}">Bestätigen</button>
+      <div class="counter-status-row">
+        <div class="counter-value-block">
+          <div class="counter-value">${escapeHtml(String(value))}</div>
+          <p class="note-preview-meta">Aktueller Stand</p>
+        </div>
+        <div class="counter-value-block">
+          <div class="counter-value target">${escapeHtml(String(target))}</div>
+          <p class="note-preview-meta">Zielwert</p>
+        </div>
       </div>
+      <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, Math.round((value / target) * 100))}">
+        <div class="preview-progress-fill" style="width:${Math.min(100, Math.round((value / target) * 100))}%;"></div>
+      </div>
+      <button type="button" class="button-primary" data-action="confirm-counter-plus" data-note-id="${escapeAttribute(note.id)}">Bestätigen</button>
       <ul class="counter-log">
-        ${log.map((entry) => `<li>${escapeHtml(entry.timestamp)} · ${escapeHtml(entry.actor_name || 'Unbekannt')} (${escapeHtml(entry.actor_uid || 'ohne UID')})</li>`).join('') || '<li>Keine Einträge</li>'}
+        ${log.map((entry) => `<li>${escapeHtml(formatTimestamp(entry.timestamp))} · ${escapeHtml(entry.actor_name || 'Unbekannt')} (${escapeHtml(entry.actor_uid || 'ohne UID')})</li>`).join('') || '<li>Keine Einträge</li>'}
       </ul>
+      ${renderAttachmentsSection(note)}
+    </article>
+  `;
+}
+
+function renderAttachmentsSection(note) {
+  const attachments = normalizeAttachments(note.attachments);
+  const noteId = escapeAttribute(note.id);
+  return `
+    <section class="attachments-section">
+      <header class="attachments-header">
+        <h4>Dokumente</h4>
+        <label class="button-secondary upload-button">
+          Anhängen
+          <input type="file" data-action="upload-attachment" data-note-id="${noteId}" accept="${escapeAttribute(DOCUMENT_ACCEPT)}" />
+        </label>
+      </header>
+      <div class="attachments-grid">
+        ${attachments.length ? attachments.map((attachment, index) => renderAttachmentCard(note, attachment, index)).join('') : '<p class="note-preview-meta">Keine Dokumente vorhanden.</p>'}
+      </div>
+    </section>
+  `;
+}
+
+function renderAttachmentCard(note, attachment, index) {
+  const type = getAttachmentType(attachment);
+  const url = getAttachmentUrl(attachment);
+  const uploadedInfo = attachment.uploadedAt ? `${formatTimestamp(attachment.uploadedAt)} · ${attachment.uploadedByName || 'Unbekannt'}` : '';
+  const deleteButton = `<button type="button" class="button-danger attachment-delete" data-action="delete-attachment" data-note-id="${escapeAttribute(note.id)}" data-index="${index}">Entfernen</button>`;
+
+  if (type === 'image') {
+    return `
+      <article class="attachment-card image">
+        <a href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">
+          <img src="${escapeAttribute(url)}" alt="${escapeAttribute(attachment.name || 'Bild')}" loading="lazy" />
+        </a>
+        <div class="attachment-meta">
+          <strong>${escapeHtml(attachment.name || 'Bild')}</strong>
+          <span>${escapeHtml(uploadedInfo)}</span>
+        </div>
+        ${deleteButton}
+      </article>
+    `;
+  }
+
+  if (type === 'audio') {
+    return `
+      <article class="attachment-card audio">
+        <div class="attachment-meta">
+          <strong>🎙️ ${escapeHtml(attachment.name || 'Audio')}</strong>
+          <span>${escapeHtml(uploadedInfo)}</span>
+        </div>
+        <audio controls preload="none" src="${escapeAttribute(url)}"></audio>
+        <div class="attachment-actions-row">
+          <a class="button-secondary" href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">Öffnen</a>
+          ${deleteButton}
+        </div>
+      </article>
+    `;
+  }
+
+  return `
+    <article class="attachment-card pdf">
+      <div class="attachment-meta">
+        <strong>📄 ${escapeHtml(attachment.name || 'Dokument')}</strong>
+        <span>${escapeHtml(uploadedInfo)}</span>
+      </div>
+      <div class="attachment-actions-row">
+        <a class="button-secondary" href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">Öffnen</a>
+        <a class="button-secondary" href="${escapeAttribute(url)}" download="${escapeAttribute(attachment.name || 'dokument.pdf')}">Download</a>
+        ${deleteButton}
+      </div>
     </article>
   `;
 }
@@ -344,33 +441,32 @@ async function handleCreateNote(event) {
   if (!state.activeColumnKey) return;
 
   const noteType = String(elements.newNoteType.value || 'text');
-  const title = String(elements.newNoteTitle.value || '').trim();
   const basePayload = {
     project_id: state.projectId,
     status: state.activeColumnKey,
     position: getNotesByColumn(state.activeColumnKey).length,
     note_type: noteType,
-    title,
+    title: '',
     content: '',
     todo_description: '',
     todo_items: [],
     counter_description: '',
-    counter_start_value: 0,
+    counter_start_value: 1,
     counter_value: 0,
     counter_log: [],
+    attachments: [],
   };
 
   if (noteType === 'text') {
     const content = String(elements.newNoteText.value || '').trim();
     if (!content) {
-      showAlert('Text-Notiz benötigt einen Inhalt.', true);
+      showAlert('Notiz benötigt eine Beschreibung.', true);
       return;
     }
     basePayload.content = content;
   }
 
   if (noteType === 'todo') {
-    basePayload.title = '';
     basePayload.todo_description = String(elements.newTodoDescription.value || '').trim();
     const firstTodo = String(elements.newTodoItem.value || '').trim();
     if (firstTodo) {
@@ -379,11 +475,14 @@ async function handleCreateNote(event) {
   }
 
   if (noteType === 'counter') {
-    basePayload.title = '';
-    const startValue = Number(elements.newCounterStart.value || 0);
+    const targetValue = Number(elements.newCounterStart.value || 1);
     basePayload.counter_description = String(elements.newCounterDescription.value || '').trim();
-    basePayload.counter_start_value = Number.isFinite(startValue) ? Math.round(startValue) : 0;
-    basePayload.counter_value = basePayload.counter_start_value;
+    if (!basePayload.counter_description) {
+      showAlert('Counter-Notiz benötigt eine Beschreibung.', true);
+      return;
+    }
+    basePayload.counter_start_value = Number.isFinite(targetValue) && targetValue > 0 ? Math.round(targetValue) : 1;
+    basePayload.counter_value = 0;
   }
 
   const { error } = await state.supabase.from(KANBAN_TABLE).insert(basePayload);
@@ -403,12 +502,7 @@ async function handleModalClick(event) {
   if (!noteId) return;
 
   if (button.dataset.action === 'delete') {
-    const { error } = await state.supabase.from(KANBAN_TABLE).delete().eq('id', noteId);
-    if (error) {
-      showAlert(`Notiz konnte nicht gelöscht werden: ${error.message}`, true);
-      return;
-    }
-    await loadData();
+    await deleteNote(noteId);
     return;
   }
 
@@ -432,14 +526,16 @@ async function handleModalClick(event) {
     return;
   }
 
-  if (button.dataset.action === 'open-counter-comment') {
-    const box = elements.modalNotesList.querySelector(`[data-counter-box="${noteId}"]`);
-    box?.classList.toggle('hidden');
+  if (button.dataset.action === 'confirm-counter-plus') {
+    await incrementCounter(noteId);
     return;
   }
 
-  if (button.dataset.action === 'confirm-counter-minus') {
-    await decrementCounter(noteId);
+  if (button.dataset.action === 'delete-attachment') {
+    const index = Number(button.dataset.index);
+    if (Number.isInteger(index) && index >= 0) {
+      await deleteAttachment(noteId, index);
+    }
   }
 }
 
@@ -465,6 +561,14 @@ async function handleModalChange(event) {
       return;
     }
     await loadData();
+    return;
+  }
+
+  if (action === 'upload-attachment') {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await uploadAttachment(noteId, file);
+    event.target.value = '';
   }
 }
 
@@ -480,10 +584,11 @@ function openCreateNoteForm() {
   if (!elements.createNoteForm) return;
   elements.createNoteForm.classList.remove('hidden');
   elements.createNoteForm.reset();
+  if (elements.newCounterStart) elements.newCounterStart.value = '1';
   if (elements.newNoteType) elements.newNoteType.value = 'text';
   updateCreateTypeFields();
   if (String(elements.newNoteType?.value || '') === 'text') {
-    elements.newNoteTitle?.focus();
+    elements.newNoteText?.focus();
   } else if (String(elements.newNoteType?.value || '') === 'todo') {
     elements.newTodoDescription?.focus();
   } else {
@@ -492,22 +597,21 @@ function openCreateNoteForm() {
 }
 
 async function saveTextNote(noteId) {
-  const titleInput = elements.modalNotesList.querySelector(`[data-field="title"][data-note-id="${noteId}"]`);
   const contentInput = elements.modalNotesList.querySelector(`[data-field="content"][data-note-id="${noteId}"]`);
   const payload = {
-    title: String(titleInput?.value || '').trim(),
+    title: '',
     content: String(contentInput?.value || '').trim(),
   };
   if (!payload.content) {
-    showAlert('Text-Notiz darf nicht leer sein.', true);
+    showAlert('Notiz darf nicht leer sein.', true);
     return;
   }
   const { error } = await state.supabase.from(KANBAN_TABLE).update(payload).eq('id', noteId);
   if (error) {
-    showAlert(`Text-Notiz konnte nicht gespeichert werden: ${error.message}`, true);
+    showAlert(`Notiz konnte nicht gespeichert werden: ${error.message}`, true);
     return;
   }
-  showAlert('Text-Notiz gespeichert.');
+  showAlert('Notiz gespeichert.');
   await loadData();
 }
 
@@ -534,7 +638,7 @@ async function addTodoItem(noteId) {
   const note = state.notes.find((entry) => String(entry.id) === noteId);
   if (!note) return;
   const items = normalizeTodoItems(note.todo_items);
-  items.push({ text, done: false });
+  items.push({ text, done: false, done_by_uid: null, done_by_name: null, done_at: null });
 
   const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: items }).eq('id', noteId);
   if (error) {
@@ -546,9 +650,14 @@ async function addTodoItem(noteId) {
 
 async function saveCounterMeta(noteId) {
   const descriptionInput = elements.modalNotesList.querySelector(`[data-field="counter-description"][data-note-id="${noteId}"]`);
+  const counter_description = String(descriptionInput?.value || '').trim();
+  if (!counter_description) {
+    showAlert('Counter-Beschreibung ist erforderlich.', true);
+    return;
+  }
   const payload = {
     title: '',
-    counter_description: String(descriptionInput?.value || '').trim(),
+    counter_description,
   };
   const { error } = await state.supabase.from(KANBAN_TABLE).update(payload).eq('id', noteId);
   if (error) {
@@ -559,14 +668,14 @@ async function saveCounterMeta(noteId) {
   await loadData();
 }
 
-async function decrementCounter(noteId) {
+async function incrementCounter(noteId) {
   const note = state.notes.find((entry) => String(entry.id) === noteId);
   if (!note) return;
 
-  const nextValue = Number(note.counter_value ?? 0) - 1;
+  const nextValue = Math.max(0, Number(note.counter_value ?? 0)) + 1;
   const nextLog = normalizeCounterLog(note.counter_log);
   nextLog.unshift({
-    timestamp: new Date().toLocaleString('de-CH'),
+    timestamp: new Date().toISOString(),
     actor_uid: getCurrentUserUid(),
     actor_name: getCurrentUserName(),
   });
@@ -576,10 +685,108 @@ async function decrementCounter(noteId) {
     counter_log: nextLog,
   }).eq('id', noteId);
   if (error) {
-    showAlert(`Counter konnte nicht reduziert werden: ${error.message}`, true);
+    showAlert(`Counter konnte nicht bestätigt werden: ${error.message}`, true);
     return;
   }
   await loadData();
+}
+
+async function deleteNote(noteId) {
+  const note = state.notes.find((entry) => String(entry.id) === noteId);
+  if (note) {
+    await deleteAttachmentFiles(normalizeAttachments(note.attachments));
+  }
+
+  const { error } = await state.supabase.from(KANBAN_TABLE).delete().eq('id', noteId);
+  if (error) {
+    showAlert(`Notiz konnte nicht gelöscht werden: ${error.message}`, true);
+    return;
+  }
+  await loadData();
+}
+
+async function uploadAttachment(noteId, file) {
+  const mimeType = String(file?.type || '').toLowerCase();
+  if (!mimeType.startsWith('image/') && !mimeType.startsWith('audio/') && mimeType !== 'application/pdf') {
+    showAlert('Nur PDF, Bild oder Audio ist erlaubt.', true);
+    return;
+  }
+
+  const note = state.notes.find((entry) => String(entry.id) === noteId);
+  if (!note) {
+    showAlert('Notiz wurde nicht gefunden.', true);
+    return;
+  }
+
+  const safeFileName = sanitizeFileName(file.name || 'dokument');
+  const storagePath = `${state.projectId}/${noteId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}-${safeFileName}`;
+  const { error: uploadError } = await state.supabase.storage
+    .from(ATTACHMENTS_BUCKET)
+    .upload(storagePath, file, { upsert: false, contentType: file.type || undefined });
+
+  if (uploadError) {
+    showAlert(`Upload fehlgeschlagen: ${uploadError.message}`, true);
+    return;
+  }
+
+  const attachments = normalizeAttachments(note.attachments);
+  attachments.unshift({
+    name: file.name || 'Dokument',
+    mimeType: mimeType || 'application/octet-stream',
+    bucket: ATTACHMENTS_BUCKET,
+    path: storagePath,
+    uploadedAt: new Date().toISOString(),
+    uploadedByUid: getCurrentUserUid(),
+    uploadedByName: getCurrentUserName(),
+    size: Number(file.size || 0),
+  });
+
+  const { error: updateError } = await state.supabase.from(KANBAN_TABLE).update({ attachments }).eq('id', noteId);
+  if (updateError) {
+    await state.supabase.storage.from(ATTACHMENTS_BUCKET).remove([storagePath]);
+    showAlert(`Dokument konnte nicht gespeichert werden: ${updateError.message}`, true);
+    return;
+  }
+
+  await loadData();
+}
+
+async function deleteAttachment(noteId, index) {
+  const note = state.notes.find((entry) => String(entry.id) === noteId);
+  if (!note) return;
+
+  const attachments = normalizeAttachments(note.attachments);
+  const [attachment] = attachments.splice(index, 1);
+  if (!attachment) return;
+
+  await deleteAttachmentFiles([attachment]);
+
+  const { error } = await state.supabase.from(KANBAN_TABLE).update({ attachments }).eq('id', noteId);
+  if (error) {
+    showAlert(`Dokument konnte nicht entfernt werden: ${error.message}`, true);
+    return;
+  }
+
+  await loadData();
+}
+
+async function deleteAttachmentFiles(attachments) {
+  const byBucket = new Map();
+  attachments.forEach((attachment) => {
+    const bucket = String(attachment?.bucket || ATTACHMENTS_BUCKET).trim() || ATTACHMENTS_BUCKET;
+    const path = String(attachment?.path || '').trim();
+    if (!path) return;
+    if (!byBucket.has(bucket)) byBucket.set(bucket, []);
+    byBucket.get(bucket).push(path);
+  });
+
+  for (const [bucket, paths] of byBucket.entries()) {
+    if (!paths.length) continue;
+    const { error } = await state.supabase.storage.from(bucket).remove(paths);
+    if (error) {
+      showAlert(`Warnung: Dokumentdatei konnte nicht gelöscht werden (${error.message}).`, true);
+    }
+  }
 }
 
 function handleDragStart(event) {
@@ -617,6 +824,47 @@ async function handleDrop(event) {
   await loadData();
 }
 
+function openDocumentsModal() {
+  elements.documentsModal?.classList.remove('hidden');
+  renderDocumentsOverview();
+}
+
+function closeDocumentsModal() {
+  elements.documentsModal?.classList.add('hidden');
+}
+
+function renderDocumentsOverview() {
+  if (!elements.documentsOverviewList) return;
+  const allDocuments = getAllDocuments();
+
+  if (!allDocuments.length) {
+    elements.documentsOverviewList.innerHTML = '<p class="modal-empty">Noch keine Dokumente im Kanban-System vorhanden.</p>';
+    return;
+  }
+
+  elements.documentsOverviewList.innerHTML = allDocuments.map((entry) => `
+    <article class="documents-overview-card">
+      <div class="documents-overview-main">
+        <p class="documents-type">${escapeHtml(getAttachmentTypeLabel(entry.attachment))}</p>
+        <strong>${escapeHtml(entry.attachment.name || 'Dokument')}</strong>
+        <p class="note-preview-meta">${escapeHtml(entry.columnLabel)} · ${escapeHtml(getTypeLabel(getNoteType(entry.note)))} · ${escapeHtml(getPreviewText(entry.note, getNoteType(entry.note)))}</p>
+        <p class="note-preview-meta">${escapeHtml(entry.attachment.uploadedByName || 'Unbekannt')} · ${escapeHtml(formatTimestamp(entry.attachment.uploadedAt))}</p>
+      </div>
+      <div class="attachment-actions-row">
+        <a class="button-secondary" href="${escapeAttribute(getAttachmentUrl(entry.attachment))}" target="_blank" rel="noopener noreferrer">Öffnen</a>
+      </div>
+    </article>
+  `).join('');
+}
+
+function getAllDocuments() {
+  return state.notes.flatMap((note) => normalizeAttachments(note.attachments).map((attachment) => ({
+    note,
+    attachment,
+    columnLabel: getColumnMeta(note.status).label,
+  })));
+}
+
 function getNotesByColumn(columnKey) {
   return state.notes
     .filter((entry) => String(entry.status) === columnKey)
@@ -627,6 +875,12 @@ function getNoteType(note) {
   const type = String(note.note_type || '').trim();
   if (type === 'todo' || type === 'counter' || type === 'text') return type;
   return 'text';
+}
+
+function getTypeLabel(type) {
+  if (type === 'todo') return 'To-do';
+  if (type === 'counter') return 'Counter';
+  return 'Notiz';
 }
 
 function getColumnMeta(columnKey) {
@@ -657,6 +911,46 @@ function normalizeCounterLog(value) {
     .filter((entry) => entry.timestamp);
 }
 
+function normalizeAttachments(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((attachment) => ({
+      name: String(attachment?.name || '').trim() || 'Dokument',
+      mimeType: String(attachment?.mimeType || '').trim() || 'application/octet-stream',
+      path: String(attachment?.path || '').trim(),
+      bucket: String(attachment?.bucket || ATTACHMENTS_BUCKET).trim() || ATTACHMENTS_BUCKET,
+      publicUrl: String(attachment?.publicUrl || '').trim(),
+      uploadedAt: String(attachment?.uploadedAt || '').trim(),
+      uploadedByUid: String(attachment?.uploadedByUid || '').trim(),
+      uploadedByName: String(attachment?.uploadedByName || '').trim(),
+      size: Number(attachment?.size || 0),
+    }))
+    .filter((attachment) => attachment.path || attachment.publicUrl);
+}
+
+function getAttachmentUrl(attachment) {
+  if (attachment.publicUrl) return attachment.publicUrl;
+  const bucket = String(attachment?.bucket || ATTACHMENTS_BUCKET).trim() || ATTACHMENTS_BUCKET;
+  const path = String(attachment?.path || '').trim();
+  if (!path) return '#';
+  const { data } = state.supabase.storage.from(bucket).getPublicUrl(path);
+  return String(data?.publicUrl || '').trim() || '#';
+}
+
+function getAttachmentType(attachment) {
+  const mimeType = String(attachment?.mimeType || '').toLowerCase();
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  return 'pdf';
+}
+
+function getAttachmentTypeLabel(attachment) {
+  const type = getAttachmentType(attachment);
+  if (type === 'image') return 'Bild';
+  if (type === 'audio') return 'Audio';
+  return 'PDF';
+}
+
 function getCurrentUserUid() {
   return String(state.user?.id || '').trim() || 'unbekannt';
 }
@@ -672,6 +966,18 @@ function getCurrentUserName() {
 
 function formatCurrency(value) {
   return new Intl.NumberFormat('de-CH', { style: 'currency', currency: 'CHF', minimumFractionDigits: 2 }).format(Number(value || 0));
+}
+
+function formatTimestamp(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '–';
+  return new Intl.DateTimeFormat('de-CH', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
 }
 
 function showAlert(message, isError = false) {
@@ -701,4 +1007,13 @@ function truncateText(value, maxLength) {
   const text = String(value || '').trim();
   if (text.length <= maxLength) return text;
   return `${text.slice(0, maxLength)}…`;
+}
+
+function sanitizeFileName(value) {
+  return String(value || 'dokument')
+    .normalize('NFKD')
+    .replace(/[^a-zA-Z0-9._-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 140) || 'dokument';
 }
