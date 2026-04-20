@@ -3358,6 +3358,14 @@ function openPropertyDetail(propertyId) {
   renderPropertyDetail();
 }
 
+function openPropertyDetailPage(property) {
+  if (!property?.id) return;
+  const detailUrl = new URL('./property-detail.html', window.location.href);
+  detailUrl.searchParams.set('propertyId', String(property.id));
+  detailUrl.searchParams.set('name', property.name || '');
+  window.location.href = detailUrl.toString();
+}
+
 function openSelectedPropertyForEdit() {
   const property = state.properties.find((entry) => String(entry.id) === String(state.selectedPropertyId));
   if (!property) return;
@@ -3450,8 +3458,11 @@ async function handlePropertiesTableClick(event) {
   if (!button) {
     const row = event.target.closest('tr[data-property-id]');
     const propertyIdFromRow = String(row?.dataset?.propertyId || '').trim();
-    if (propertyIdFromRow) {
-      openPropertyDetail(propertyIdFromRow);
+    if (row && propertyIdFromRow && !event.target.closest('a, button, input, select, textarea')) {
+      const selectedProperty = state.properties.find((entry) => String(entry.id) === propertyIdFromRow);
+      if (selectedProperty) {
+        openPropertyDetailPage(selectedProperty);
+      }
     }
     return;
   }

@@ -553,7 +553,7 @@
                 <div class="section-heading compact">
                   <div>
                     <h4>Objektliste</h4>
-                    <p>Neue Immobilien werden über ein Pop-up erfasst. Notizen und Dokumente erfolgen im Detail.</p>
+                    <p>Neue Immobilien werden über ein Pop-up erfasst. Für Details einfach auf eine Zeile klicken.</p>
                   </div>
                   <button id="openPropertyModalButton" class="button button-primary" type="button">Immobilie erfassen</button>
                 </div>
@@ -574,47 +574,6 @@
                 </table>
                 </div>
               </div>
-
-              <div id="propertyDetailView" class="hidden">
-                <div class="section-heading compact">
-                  <div>
-                    <h4 id="propertyDetailTitle">Immobilie</h4>
-                    <p>Klicke auf «Bearbeiten», um Stammdaten anzupassen.</p>
-                  </div>
-                  <div class="table-actions">
-                    <button id="editPropertyFromDetailButton" class="button button-secondary" type="button">Bearbeiten</button>
-                    <button id="backToPropertiesListButton" class="button button-ghost" type="button">Zurück zur Liste</button>
-                  </div>
-                </div>
-                <div class="property-detail-layout">
-                  <div class="panel property-detail-left">
-                    <h5>Informationen</h5>
-                    <div id="propertyDetailInfo" class="property-detail-info"></div>
-                    <div class="property-detail-section">
-                      <h5>Dokumente</h5>
-                      <form id="propertyDocumentForm" class="settings-form compact">
-                        <label>
-                          <span>Neue Dokumente</span>
-                          <input id="propertyDetailDocumentFileInput" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple />
-                        </label>
-                        <button class="button button-secondary" type="submit">Dokumente hochladen</button>
-                      </form>
-                      <div id="propertyDetailDocumentsList" class="property-documents-preview subtle-text">Noch keine Dokumente vorhanden.</div>
-                    </div>
-                  </div>
-                  <div class="panel property-detail-right">
-                    <h5>Notizen</h5>
-                    <form id="propertyDetailNoteForm" class="settings-form compact">
-                      <label>
-                        <span>Neue Notiz</span>
-                        <textarea id="propertyDetailNoteInput" rows="3" placeholder="Notiz zur Immobilie erfassen"></textarea>
-                      </label>
-                      <button class="button button-secondary" type="submit">Notiz hinzufügen</button>
-                    </form>
-                    <ul id="propertyDetailNotesList" class="crm-notes-list"></ul>
-                  </div>
-                </div>
-              </div>
             </div>
           </section>
         </main>
@@ -626,7 +585,7 @@
           <div class="section-heading compact">
             <div>
               <h3 id="propertyModalTitle">Immobilie erfassen</h3>
-              <p>Nur Stammdaten erfassen. Notizen und Dokumente werden danach im Detail gepflegt.</p>
+              <p>Nur Stammdaten erfassen. Notizen und Dokumente werden danach auf der Detailseite gepflegt.</p>
             </div>
             <button id="closePropertyModalButton" class="button button-ghost" type="button">Schliessen</button>
           </div>
