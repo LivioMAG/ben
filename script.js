@@ -886,7 +886,6 @@ function cacheElements() {
   elements.propertyIdInput = document.getElementById('propertyIdInput');
   elements.propertyContactIdInput = document.getElementById('propertyContactIdInput');
   elements.propertyNameInput = document.getElementById('propertyNameInput');
-  elements.propertyAddressInput = document.getElementById('propertyAddressInput');
   elements.propertyStreetInput = document.getElementById('propertyStreetInput');
   elements.propertyPostalCodeInput = document.getElementById('propertyPostalCodeInput');
   elements.propertyCityInput = document.getElementById('propertyCityInput');
@@ -3347,7 +3346,6 @@ async function handlePropertySubmit(event) {
   const propertyId = String(elements.propertyIdInput?.value || '').trim();
   const contactId = String(elements.propertyContactIdInput?.value || '').trim();
   const name = String(elements.propertyNameInput?.value || '').trim();
-  const address = String(elements.propertyAddressInput?.value || '').trim();
   const street = String(elements.propertyStreetInput?.value || '').trim();
   const postalCode = String(elements.propertyPostalCodeInput?.value || '').trim();
   const city = String(elements.propertyCityInput?.value || '').trim();
@@ -3355,8 +3353,8 @@ async function handlePropertySubmit(event) {
   const noteText = String(elements.propertyNoteInput?.value || '').trim();
   const documentFiles = elements.propertyDocumentFileInput?.files;
 
-  if (!contactId || !name || !address || !street || !postalCode || !city || Number.isNaN(budgetRaw) || budgetRaw <= 0) {
-    showInlineAlert(elements.propertiesAlert, 'Bitte CRM-Kontakt, Name, Adresse, Strasse, PLZ, Ort und Budget korrekt ausfüllen.', true);
+  if (!contactId || !name || !street || !postalCode || !city || Number.isNaN(budgetRaw) || budgetRaw <= 0) {
+    showInlineAlert(elements.propertiesAlert, 'Bitte CRM-Kontakt, Name, Strasse, PLZ, Ort und Budget korrekt ausfüllen.', true);
     return;
   }
 
@@ -3381,7 +3379,6 @@ async function handlePropertySubmit(event) {
     const payload = {
       contact_id: contactId,
       name,
-      adresse: address,
       strasse: street,
       postleitzahl: postalCode,
       ort: city,
@@ -3419,7 +3416,6 @@ async function handlePropertiesTableClick(event) {
     if (elements.propertyIdInput) elements.propertyIdInput.value = property.id || '';
     if (elements.propertyContactIdInput) elements.propertyContactIdInput.value = property.contact_id || '';
     if (elements.propertyNameInput) elements.propertyNameInput.value = property.name || '';
-    if (elements.propertyAddressInput) elements.propertyAddressInput.value = property.adresse || '';
     if (elements.propertyStreetInput) elements.propertyStreetInput.value = property.strasse || '';
     if (elements.propertyPostalCodeInput) elements.propertyPostalCodeInput.value = property.postleitzahl || '';
     if (elements.propertyCityInput) elements.propertyCityInput.value = property.ort || '';
@@ -4417,6 +4413,8 @@ function renderPropertiesTable() {
     const notes = Array.isArray(property.notizen) ? property.notizen : [];
     const documents = Array.isArray(property.dokumente) ? property.dokumente : [];
     const latestNote = notes.at(-1);
+    const locationParts = [property.strasse, [property.postleitzahl, property.ort].filter(Boolean).join(' ')].filter(Boolean);
+    const locationLabel = locationParts.join(', ') || property.adresse || '–';
     const documentLinks = documents.length
       ? `<ul>${documents.map((document) => {
         const url = getAttachmentUrl(document);
@@ -4431,7 +4429,7 @@ function renderPropertiesTable() {
     return `<tr>
       <td>${escapeHtml(property.name || '–')}</td>
       <td>${escapeHtml(getCrmContactDisplayName(linkedContact))}</td>
-      <td>${escapeHtml(property.adresse || '–')}</td>
+      <td>${escapeHtml(locationLabel)}</td>
       <td>${escapeHtml(formatCurrency(Number(property.budget || 0)))}</td>
       <td>${latestNote ? `${escapeHtml(String(latestNote.text || ''))}<br><span class="subtle-text">${escapeHtml(String(latestNote.author || 'Unbekannt'))}</span>` : '<span class="subtle-text">Keine Notiz</span>'}</td>
       <td>${documentLinks}</td>
