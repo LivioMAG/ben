@@ -406,8 +406,27 @@ body {
 
 .counter-value { font-size: 30px; font-weight: 800; line-height: 1; margin: 2px 0; }
 .counter-value.target { color: rgba(15, 23, 42, 0.75); }
-.counter-main { text-align: left; font-size: 18px; font-weight: 600; letter-spacing: 0; }
+.counter-main { text-align: left; font-size: 14px; font-weight: 600; letter-spacing: 0; }
 .counter-plus { width: 100%; padding: 7px 10px; font-size: 13px; }
+.counter-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.counter-history-open { width: 100%; }
+.counter-target-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: rgba(15, 23, 42, 0.72);
+}
+.counter-target-inline input {
+  width: 78px;
+  border: 0;
+  border-bottom: 1px solid #d1d5db;
+  border-radius: 0;
+  padding: 4px 2px;
+  background: transparent;
+  font: inherit;
+}
+.counter-target-inline input:focus { outline: none; border-bottom-color: #0f172a; }
 
 .counter-log {
   margin: 0;
@@ -429,6 +448,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 10px;
 }
 
 .attachments-header h4 { margin: 0; font-size: 13px; }
@@ -441,7 +461,26 @@ body {
   justify-content: center;
 }
 
+.upload-link {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  cursor: pointer;
+}
+
 .upload-button input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-link input[type='file'] {
   position: absolute;
   inset: 0;
   opacity: 0;
@@ -451,7 +490,7 @@ body {
 .attachments-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 8px;
+  gap: 14px;
 }
 
 .attachment-card {
@@ -629,6 +668,24 @@ body {
 }
 
 .counter-log.minimal { padding-left: 16px; margin: 4px 0 0; }
+.counter-history-modal-card { width: min(560px, calc(100vw - 44px)); }
+.counter-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.counter-history-list li {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+  display: grid;
+  gap: 2px;
+  background: #f8fafc;
+}
+.counter-history-list strong { font-size: 13px; }
+.counter-history-list span { font-size: 12px; color: rgba(15, 23, 42, 0.58); }
 
 @media (max-width: 1280px) {
   .kanban-board { grid-template-columns: repeat(5, minmax(260px, 1fr)); }
