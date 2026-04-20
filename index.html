@@ -298,7 +298,7 @@
               <div class="section-heading">
                 <div>
                   <h3>Projekte / Aufträge</h3>
-                  <p>Projekte verwalten und Projektleiter/Bauleiter zuweisen.</p>
+                  <p>Aufträge mit Immobilie, automatischer Kommissionsnummer und Spesen-Einstellung verwalten.</p>
                 </div>
               </div>
               <div id="projectsAlert" class="alert hidden"></div>
@@ -306,10 +306,10 @@
                 <div class="report-filter-toolbar">
                   <label>
                     <span>Suche</span>
-                    <input id="projectSearchInput" type="search" placeholder="Nach Kommissionsnummer oder Projektname suchen" />
+                    <input id="projectSearchInput" type="search" placeholder="Nach Immobilie oder Kommissionsnummer suchen" />
                   </label>
                   <div class="report-filter-actions">
-                    <button id="openProjectModalButton" class="button button-primary button-icon" type="button" title="Projekt hinzufügen" aria-label="Projekt hinzufügen">+</button>
+                    <button id="openProjectModalButton" class="button button-primary button-icon" type="button" title="Auftrag hinzufügen" aria-label="Auftrag hinzufügen">+</button>
                   </div>
                 </div>
               </div>
@@ -317,12 +317,11 @@
                 <table>
                   <thead>
                     <tr>
+                      <th>Immobilie</th>
                       <th>Kommissionsnummer</th>
-                      <th>Projektname</th>
-                      <th>Projektleiter</th>
-                      <th>Bauleiter</th>
+                      <th>Terminiert</th>
                       <th>Spesen</th>
-                      <th>Aktionen</th>
+                      <th>Aktion</th>
                     </tr>
                   </thead>
                   <tbody id="projectsTableBody"></tbody>
@@ -860,20 +859,12 @@
             <input id="projectIdInput" type="hidden" />
             <div class="projects-form-grid">
               <label>
+                <span>Immobilie *</span>
+                <select id="projectPropertySelect" required></select>
+              </label>
+              <label>
                 <span>Kommissionsnummer *</span>
-                <input id="projectCommissionInput" type="text" required />
-              </label>
-              <label>
-                <span>Projektname *</span>
-                <input id="projectNameInput" type="text" required />
-              </label>
-              <label>
-                <span>Bauleiter *</span>
-                <select id="constructionLeadSelect" required></select>
-              </label>
-              <label>
-                <span>Projektleiter *</span>
-                <select id="projectLeadSelect" required></select>
+                <input id="projectCommissionInput" type="text" required readonly />
               </label>
               <label class="checkbox-label">
                 <input id="projectExpensesAllowedInput" type="checkbox" checked />
