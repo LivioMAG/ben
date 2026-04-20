@@ -626,6 +626,7 @@ const state = {
   crmNotes: [],
   properties: [],
   selectedCrmContactId: null,
+  selectedPropertyId: null,
   crmSearchQuery: '',
   crmCategoryFilter: '',
   selectedWeek: getCurrentWeekValue(),
@@ -890,11 +891,23 @@ function cacheElements() {
   elements.propertyPostalCodeInput = document.getElementById('propertyPostalCodeInput');
   elements.propertyCityInput = document.getElementById('propertyCityInput');
   elements.propertyBudgetInput = document.getElementById('propertyBudgetInput');
-  elements.propertyNoteInput = document.getElementById('propertyNoteInput');
-  elements.propertyDocumentFileInput = document.getElementById('propertyDocumentFileInput');
-  elements.propertyDocumentsPreview = document.getElementById('propertyDocumentsPreview');
   elements.resetPropertyFormButton = document.getElementById('resetPropertyFormButton');
+  elements.openPropertyModalButton = document.getElementById('openPropertyModalButton');
+  elements.propertyModal = document.getElementById('propertyModal');
+  elements.closePropertyModalButton = document.getElementById('closePropertyModalButton');
   elements.propertiesTableBody = document.getElementById('propertiesTableBody');
+  elements.propertiesListView = document.getElementById('propertiesListView');
+  elements.propertyDetailView = document.getElementById('propertyDetailView');
+  elements.propertyDetailTitle = document.getElementById('propertyDetailTitle');
+  elements.propertyDetailInfo = document.getElementById('propertyDetailInfo');
+  elements.propertyDetailDocumentsList = document.getElementById('propertyDetailDocumentsList');
+  elements.propertyDetailDocumentFileInput = document.getElementById('propertyDetailDocumentFileInput');
+  elements.propertyDocumentForm = document.getElementById('propertyDocumentForm');
+  elements.propertyDetailNotesList = document.getElementById('propertyDetailNotesList');
+  elements.propertyDetailNoteInput = document.getElementById('propertyDetailNoteInput');
+  elements.propertyDetailNoteForm = document.getElementById('propertyDetailNoteForm');
+  elements.backToPropertiesListButton = document.getElementById('backToPropertiesListButton');
+  elements.editPropertyFromDetailButton = document.getElementById('editPropertyFromDetailButton');
 }
 
 function bindEvents() {
@@ -1084,11 +1097,36 @@ function bindEvents() {
   if (elements.propertyForm) {
     elements.propertyForm.addEventListener('submit', handlePropertySubmit);
   }
+  if (elements.openPropertyModalButton) {
+    elements.openPropertyModalButton.addEventListener('click', () => openPropertyModal());
+  }
+  if (elements.closePropertyModalButton) {
+    elements.closePropertyModalButton.addEventListener('click', closePropertyModal);
+  }
+  if (elements.propertyModal) {
+    elements.propertyModal.addEventListener('click', (event) => {
+      if (event.target?.dataset?.closePropertyModal === 'true') {
+        closePropertyModal();
+      }
+    });
+  }
   if (elements.resetPropertyFormButton) {
     elements.resetPropertyFormButton.addEventListener('click', resetPropertyForm);
   }
   if (elements.propertiesTableBody) {
     elements.propertiesTableBody.addEventListener('click', handlePropertiesTableClick);
+  }
+  if (elements.backToPropertiesListButton) {
+    elements.backToPropertiesListButton.addEventListener('click', closePropertyDetail);
+  }
+  if (elements.editPropertyFromDetailButton) {
+    elements.editPropertyFromDetailButton.addEventListener('click', openSelectedPropertyForEdit);
+  }
+  if (elements.propertyDetailNoteForm) {
+    elements.propertyDetailNoteForm.addEventListener('submit', handlePropertyDetailNoteSubmit);
+  }
+  if (elements.propertyDocumentForm) {
+    elements.propertyDocumentForm.addEventListener('submit', handlePropertyDetailDocumentSubmit);
   }
   document.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('focus', handleWindowFocus);
@@ -1563,6 +1601,9 @@ async function loadData() {
     if (state.selectedCrmContactId && !state.crmContacts.some((item) => String(item.id) === String(state.selectedCrmContactId))) {
       state.selectedCrmContactId = null;
     }
+    if (state.selectedPropertyId && !state.properties.some((item) => String(item.id) === String(state.selectedPropertyId))) {
+      state.selectedPropertyId = null;
+    }
     state.roleAssignments = [];
     syncEmployeeSelection();
     syncAbsenceSelection();
@@ -1714,6 +1755,7 @@ function render() {
   renderCrmNotesPanel();
   renderPropertyContactOptions();
   renderPropertiesTable();
+  renderPropertyDetail();
   renderLoadingOverlay();
 }
 
@@ -3284,25 +3326,44 @@ function resetPropertyForm() {
   if (elements.propertyIdInput) {
     elements.propertyIdInput.value = '';
   }
-  renderPropertyDocumentsPreview([]);
 }
 
-function renderPropertyDocumentsPreview(documents) {
-  if (!elements.propertyDocumentsPreview) return;
-  const safeDocuments = Array.isArray(documents) ? documents : [];
-  if (!safeDocuments.length) {
-    elements.propertyDocumentsPreview.innerHTML = 'Noch keine Dokumente vorhanden.';
+function openPropertyModal(property = null) {
+  if (!elements.propertyModal) return;
+  elements.propertyModal.classList.remove('hidden');
+  if (!property) {
+    resetPropertyForm();
     return;
   }
-  const listMarkup = safeDocuments.map((document) => {
-    const url = getAttachmentUrl(document);
-    const name = String(document?.name || 'Dokument');
-    if (!url) {
-      return `<li>${escapeHtml(name)}</li>`;
-    }
-    return `<li><a href="${escapeAttribute(url)}" target="_blank" rel="noopener">${escapeHtml(name)}</a></li>`;
-  }).join('');
-  elements.propertyDocumentsPreview.innerHTML = `<strong>Vorhandene Dokumente:</strong><ul>${listMarkup}</ul>`;
+  if (elements.propertyIdInput) elements.propertyIdInput.value = property.id || '';
+  if (elements.propertyContactIdInput) elements.propertyContactIdInput.value = property.contact_id || '';
+  if (elements.propertyNameInput) elements.propertyNameInput.value = property.name || '';
+  if (elements.propertyStreetInput) elements.propertyStreetInput.value = property.strasse || '';
+  if (elements.propertyPostalCodeInput) elements.propertyPostalCodeInput.value = property.postleitzahl || '';
+  if (elements.propertyCityInput) elements.propertyCityInput.value = property.ort || '';
+  if (elements.propertyBudgetInput) elements.propertyBudgetInput.value = Number(property.budget || 0).toFixed(2);
+}
+
+function closePropertyModal() {
+  if (!elements.propertyModal) return;
+  elements.propertyModal.classList.add('hidden');
+}
+
+function closePropertyDetail() {
+  state.selectedPropertyId = null;
+  renderPropertyDetail();
+}
+
+function openPropertyDetail(propertyId) {
+  if (!propertyId) return;
+  state.selectedPropertyId = propertyId;
+  renderPropertyDetail();
+}
+
+function openSelectedPropertyForEdit() {
+  const property = state.properties.find((entry) => String(entry.id) === String(state.selectedPropertyId));
+  if (!property) return;
+  openPropertyModal(property);
 }
 
 async function uploadPropertyDocuments(propertyId, files) {
@@ -3350,32 +3411,14 @@ async function handlePropertySubmit(event) {
   const postalCode = String(elements.propertyPostalCodeInput?.value || '').trim();
   const city = String(elements.propertyCityInput?.value || '').trim();
   const budgetRaw = Number(elements.propertyBudgetInput?.value || 0);
-  const noteText = String(elements.propertyNoteInput?.value || '').trim();
-  const documentFiles = elements.propertyDocumentFileInput?.files;
 
   if (!contactId || !name || !street || !postalCode || !city || Number.isNaN(budgetRaw) || budgetRaw <= 0) {
     showInlineAlert(elements.propertiesAlert, 'Bitte CRM-Kontakt, Name, Strasse, PLZ, Ort und Budget korrekt ausfüllen.', true);
     return;
   }
 
-  const existingProperty = state.properties.find((entry) => String(entry.id) === String(propertyId));
-  const nextNotes = Array.isArray(existingProperty?.notizen) ? [...existingProperty.notizen] : [];
-  const nextDocuments = Array.isArray(existingProperty?.dokumente) ? [...existingProperty.dokumente] : [];
-
-  if (noteText) {
-    nextNotes.push({
-      text: noteText,
-      author: getApprovalDisplayName(),
-      created_at: new Date().toISOString(),
-    });
-  }
-
   state.isSavingSettings = true;
   try {
-    const newDocuments = await uploadPropertyDocuments(propertyId || name, documentFiles);
-    if (newDocuments.length) {
-      nextDocuments.push(...newDocuments);
-    }
     const payload = {
       contact_id: contactId,
       name,
@@ -3383,8 +3426,6 @@ async function handlePropertySubmit(event) {
       postleitzahl: postalCode,
       ort: city,
       budget: budgetRaw,
-      notizen: nextNotes,
-      dokumente: nextDocuments,
     };
     const query = propertyId
       ? state.supabase.from(PROPERTIES_TABLE).update(payload).eq('id', propertyId)
@@ -3394,6 +3435,7 @@ async function handlePropertySubmit(event) {
 
     showInlineAlert(elements.propertiesAlert, propertyId ? 'Immobilie aktualisiert.' : 'Immobilie erstellt.', false);
     resetPropertyForm();
+    closePropertyModal();
     await loadData();
   } catch (error) {
     console.error(error);
@@ -3407,22 +3449,21 @@ async function handlePropertySubmit(event) {
 async function handlePropertiesTableClick(event) {
   if (state.isSavingSettings) return;
   const button = event.target.closest('button[data-action]');
+  if (!button) {
+    const row = event.target.closest('tr[data-property-id]');
+    const propertyIdFromRow = String(row?.dataset?.propertyId || '').trim();
+    if (propertyIdFromRow) {
+      openPropertyDetail(propertyIdFromRow);
+    }
+    return;
+  }
   const propertyId = String(button?.dataset?.propertyId || '').trim();
   if (!propertyId) return;
   const property = state.properties.find((entry) => String(entry.id) === propertyId);
   if (!property) return;
 
   if (button.dataset.action === 'edit-property') {
-    if (elements.propertyIdInput) elements.propertyIdInput.value = property.id || '';
-    if (elements.propertyContactIdInput) elements.propertyContactIdInput.value = property.contact_id || '';
-    if (elements.propertyNameInput) elements.propertyNameInput.value = property.name || '';
-    if (elements.propertyStreetInput) elements.propertyStreetInput.value = property.strasse || '';
-    if (elements.propertyPostalCodeInput) elements.propertyPostalCodeInput.value = property.postleitzahl || '';
-    if (elements.propertyCityInput) elements.propertyCityInput.value = property.ort || '';
-    if (elements.propertyBudgetInput) elements.propertyBudgetInput.value = Number(property.budget || 0).toFixed(2);
-    if (elements.propertyNoteInput) elements.propertyNoteInput.value = '';
-    if (elements.propertyDocumentFileInput) elements.propertyDocumentFileInput.value = '';
-    renderPropertyDocumentsPreview(property.dokumente);
+    openPropertyModal(property);
     showInlineAlert(elements.propertiesAlert, 'Immobilie zum Bearbeiten geladen.', false);
     return;
   }
@@ -3442,6 +3483,63 @@ async function handlePropertiesTableClick(event) {
       state.isSavingSettings = false;
       render();
     }
+  }
+}
+
+async function handlePropertyDetailNoteSubmit(event) {
+  event.preventDefault();
+  if (!state.supabase || state.isSavingSettings || !state.selectedPropertyId) return;
+  const noteText = String(elements.propertyDetailNoteInput?.value || '').trim();
+  if (!noteText) {
+    showInlineAlert(elements.propertiesAlert, 'Bitte zuerst eine Notiz erfassen.', true);
+    return;
+  }
+  const property = state.properties.find((entry) => String(entry.id) === String(state.selectedPropertyId));
+  if (!property) return;
+  const nextNotes = Array.isArray(property.notizen) ? [...property.notizen] : [];
+  nextNotes.push({ text: noteText, author: getApprovalDisplayName(), created_at: new Date().toISOString() });
+  state.isSavingSettings = true;
+  try {
+    const { error } = await state.supabase.from(PROPERTIES_TABLE).update({ notizen: nextNotes }).eq('id', property.id);
+    if (error) throw error;
+    if (elements.propertyDetailNoteInput) elements.propertyDetailNoteInput.value = '';
+    showInlineAlert(elements.propertiesAlert, 'Notiz gespeichert.', false);
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    showInlineAlert(elements.propertiesAlert, `Notiz konnte nicht gespeichert werden: ${error.message}`, true);
+  } finally {
+    state.isSavingSettings = false;
+    render();
+  }
+}
+
+async function handlePropertyDetailDocumentSubmit(event) {
+  event.preventDefault();
+  if (!state.supabase || state.isSavingSettings || !state.selectedPropertyId) return;
+  const files = elements.propertyDetailDocumentFileInput?.files;
+  if (!files || !files.length) {
+    showInlineAlert(elements.propertiesAlert, 'Bitte mindestens ein Dokument auswählen.', true);
+    return;
+  }
+  const property = state.properties.find((entry) => String(entry.id) === String(state.selectedPropertyId));
+  if (!property) return;
+  const nextDocuments = Array.isArray(property.dokumente) ? [...property.dokumente] : [];
+  state.isSavingSettings = true;
+  try {
+    const newDocuments = await uploadPropertyDocuments(property.id, files);
+    nextDocuments.push(...newDocuments);
+    const { error } = await state.supabase.from(PROPERTIES_TABLE).update({ dokumente: nextDocuments }).eq('id', property.id);
+    if (error) throw error;
+    if (elements.propertyDetailDocumentFileInput) elements.propertyDetailDocumentFileInput.value = '';
+    showInlineAlert(elements.propertiesAlert, 'Dokumente gespeichert.', false);
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    showInlineAlert(elements.propertiesAlert, `Dokumente konnten nicht gespeichert werden: ${error.message}`, true);
+  } finally {
+    state.isSavingSettings = false;
+    render();
   }
 }
 
@@ -4426,7 +4524,7 @@ function renderPropertiesTable() {
       }).join('')}</ul>`
       : '<span class="subtle-text">Keine Dokumente</span>';
 
-    return `<tr>
+    return `<tr class="table-row-clickable" data-property-id="${escapeAttribute(property.id)}">
       <td>${escapeHtml(property.name || '–')}</td>
       <td>${escapeHtml(getCrmContactDisplayName(linkedContact))}</td>
       <td>${escapeHtml(locationLabel)}</td>
@@ -4441,6 +4539,55 @@ function renderPropertiesTable() {
       </td>
     </tr>`;
   }).join('');
+}
+
+function renderPropertyDetail() {
+  if (!elements.propertiesListView || !elements.propertyDetailView) return;
+  const property = state.properties.find((entry) => String(entry.id) === String(state.selectedPropertyId));
+  const hasSelection = Boolean(property);
+  elements.propertiesListView.classList.toggle('hidden', hasSelection);
+  elements.propertyDetailView.classList.toggle('hidden', !hasSelection);
+  if (!property) return;
+  const linkedContact = state.crmContacts.find((contact) => String(contact.id) === String(property.contact_id));
+  const documents = Array.isArray(property.dokumente) ? property.dokumente : [];
+  const notes = Array.isArray(property.notizen) ? [...property.notizen].reverse() : [];
+  if (elements.propertyDetailTitle) {
+    elements.propertyDetailTitle.textContent = property.name || 'Immobilie';
+  }
+  if (elements.propertyDetailInfo) {
+    elements.propertyDetailInfo.innerHTML = `
+      <dl>
+        <dt>Kontakt</dt><dd>${escapeHtml(getCrmContactDisplayName(linkedContact))}</dd>
+        <dt>Adresse</dt><dd>${escapeHtml(property.strasse || '—')}</dd>
+        <dt>PLZ / Ort</dt><dd>${escapeHtml([property.postleitzahl, property.ort].filter(Boolean).join(' ') || '—')}</dd>
+        <dt>Budget</dt><dd>${escapeHtml(formatCurrency(Number(property.budget || 0)))}</dd>
+      </dl>
+    `;
+  }
+  if (elements.propertyDetailDocumentsList) {
+    if (!documents.length) {
+      elements.propertyDetailDocumentsList.innerHTML = 'Noch keine Dokumente vorhanden.';
+    } else {
+      elements.propertyDetailDocumentsList.innerHTML = `<ul>${documents.map((document) => {
+        const url = getAttachmentUrl(document);
+        const name = String(document?.name || 'Dokument');
+        if (!url) return `<li>${escapeHtml(name)}</li>`;
+        return `<li><a href="${escapeAttribute(url)}" target="_blank" rel="noopener">${escapeHtml(name)}</a></li>`;
+      }).join('')}</ul>`;
+    }
+  }
+  if (elements.propertyDetailNotesList) {
+    if (!notes.length) {
+      elements.propertyDetailNotesList.innerHTML = '<li class="subtle-text">Noch keine Notiz vorhanden.</li>';
+    } else {
+      elements.propertyDetailNotesList.innerHTML = notes.map((note) => `
+        <li>
+          <p>${escapeHtml(String(note.text || ''))}</p>
+          <span class="subtle-text">${escapeHtml(String(note.author || 'Unbekannt'))} · ${escapeHtml(formatDateTime(note.created_at))}</span>
+        </li>
+      `).join('');
+    }
+  }
 }
 
 function openCrmContactModal(contact = null) {
