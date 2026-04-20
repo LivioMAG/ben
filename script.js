@@ -5,6 +5,7 @@ const MATERIAL_STORAGE_BUCKET = 'material-belege';
 const CONFIG_PATH = './supabase-config.json';
 const HOLIDAY_TABLE = 'platform_holidays';
 const NOTES_TABLE = 'notes';
+const DASHBOARD_NOTES_TABLE = 'dashboard_notes';
 const PROPERTIES_TABLE = 'properties';
 const CRM_NOTE_TYPE = 'crm';
 const CRM_NOTE_CATEGORY_DEFAULT = 'information';
@@ -684,6 +685,7 @@ const state = {
   loadRecoveryTimer: null,
   lastResumeRefreshAt: 0,
   pendingDataReload: false,
+  notesDashboard: null,
 };
 
 const elements = {};
@@ -705,6 +707,7 @@ async function init() {
   state.pendingDeepLink = parseDeepLinkFromLocation();
 
   await initializeSupabase();
+  setupNotesDashboard();
   await bootstrapSession();
   applyPendingDeepLink();
   render();
@@ -927,6 +930,52 @@ function cacheElements() {
   elements.materialBelegInput = document.getElementById('materialBelegInput');
   elements.materialBetragInput = document.getElementById('materialBetragInput');
   elements.materialBeschreibungInput = document.getElementById('materialBeschreibungInput');
+  elements.notesDashboardPanel = document.getElementById('notesDashboardPanel');
+  elements.notesDashboardCanvas = document.getElementById('notesDashboardCanvas');
+  elements.notesDashboardActionBar = document.getElementById('notesDashboardActionBar');
+  elements.notesDetailModal = document.getElementById('notesDetailModal');
+  elements.notesDetailContentInput = document.getElementById('notesDetailContentInput');
+  elements.notesDetailAttachmentsList = document.getElementById('notesDetailAttachmentsList');
+  elements.notesDetailAttachmentInput = document.getElementById('notesDetailAttachmentInput');
+  elements.saveNotesDetailButton = document.getElementById('saveNotesDetailButton');
+  elements.deleteNotesDetailButton = document.getElementById('deleteNotesDetailButton');
+  elements.closeNotesDetailButton = document.getElementById('closeNotesDetailButton');
+}
+
+function setupNotesDashboard() {
+  if (typeof window.NotesDashboard !== 'function' || !elements.notesDashboardCanvas) {
+    return;
+  }
+  state.notesDashboard = new window.NotesDashboard({
+    root: elements.notesDashboardPanel,
+    canvas: elements.notesDashboardCanvas,
+    actionBar: elements.notesDashboardActionBar,
+    modal: elements.notesDetailModal,
+    modalTextarea: elements.notesDetailContentInput,
+    modalAttachments: elements.notesDetailAttachmentsList,
+    modalFileInput: elements.notesDetailAttachmentInput,
+    modalSaveButton: elements.saveNotesDetailButton,
+    modalDeleteButton: elements.deleteNotesDetailButton,
+    modalCloseButton: elements.closeNotesDetailButton,
+    getSupabase: () => state.supabase,
+    getUserId: () => state.user?.id || null,
+    onError: (message, error) => {
+      if (isMissingTableError(error, DASHBOARD_NOTES_TABLE)) {
+        console.warn('Dashboard-Notiz-Tabelle fehlt. Migration ausführen.', error);
+        return;
+      }
+      alert(`${message} ${error?.message ? `(${error.message})` : ''}`.trim());
+    },
+  });
+}
+
+async function refreshNotesDashboardData() {
+  if (!state.notesDashboard) return;
+  if (state.isDemoMode || !state.user || !state.hasAdminAccess) {
+    state.notesDashboard.clear();
+    return;
+  }
+  await state.notesDashboard.refresh();
 }
 
 function bindEvents() {
@@ -1470,6 +1519,7 @@ function resetAppState() {
 
 async function loadData() {
   if (!state.user) {
+    await refreshNotesDashboardData();
     render();
     return;
   }
@@ -1490,6 +1540,7 @@ async function loadData() {
 
   if (state.isDemoMode) {
     await loadDemoData();
+    await refreshNotesDashboardData();
     if (!finishDataLoad(requestId)) {
       return;
     }
@@ -1523,6 +1574,7 @@ async function loadData() {
       state.weeklyReportHistory = [];
       state.upcomingDailyAssignments = [];
       state.selectedCrmContactId = null;
+      await refreshNotesDashboardData();
       elements.dataTimestamp.textContent = 'Kein Zugriff – is_admin ist für dieses Profil nicht aktiviert';
       finishDataLoad(requestId);
       render();
@@ -1677,6 +1729,7 @@ async function loadData() {
     state.roleAssignments = [];
     syncEmployeeSelection();
     syncAbsenceSelection();
+    await refreshNotesDashboardData();
     elements.dataTimestamp.textContent = `Letzte Aktualisierung: ${new Date().toLocaleString('de-CH')}`;
     finishDataLoad(requestId);
     render();
