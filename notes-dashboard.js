@@ -25,7 +25,6 @@
       this.activeNoteId = null;
       this.dragState = null;
       this.isSaving = false;
-      this.lastTapAt = 0;
       this.boundResize = this.handleViewportResize.bind(this);
 
       this.bindEvents();
@@ -52,6 +51,7 @@
       this.canvas.addEventListener('dblclick', (event) => this.handleCanvasDoubleClick(event));
       this.canvas.addEventListener('pointerdown', (event) => this.handleCanvasPointerDown(event));
       this.canvas.addEventListener('click', (event) => this.handleCanvasClick(event));
+      this.canvas.addEventListener('dblclick', (event) => this.handleNoteDoubleClick(event));
 
       if (this.modalTextarea) {
         this.modalTextarea.addEventListener('input', () => this.renderModal());
@@ -178,13 +178,12 @@
       this.dragState = {
         pointerId,
         noteId: active.id,
+        noteElement: note,
         offsetX: event.clientX - bounds.left - Number(active.pos_x || 0),
         offsetY: event.clientY - bounds.top - Number(active.pos_y || 0),
       };
       note.setPointerCapture(pointerId);
-      note.addEventListener('pointermove', this.handleNotePointerMoveBound || (this.handleNotePointerMoveBound = (e) => this.handleNotePointerMove(e)));
-      note.addEventListener('pointerup', this.handleNotePointerUpBound || (this.handleNotePointerUpBound = (e) => this.handleNotePointerUp(e)));
-      note.addEventListener('pointercancel', this.handleNotePointerUpBound || (this.handleNotePointerUpBound = (e) => this.handleNotePointerUp(e)));
+      this.bindDragListeners();
       this.showActionBar();
       this.render();
     }
@@ -195,12 +194,34 @@
       const noteId = note.dataset.noteId;
       this.activeNoteId = noteId;
       this.render();
-      const now = Date.now();
-      if (now - this.lastTapAt < 280) {
-        this.openModal(noteId);
-      }
-      this.lastTapAt = now;
       this.showActionBar();
+    }
+
+    handleNoteDoubleClick(event) {
+      const note = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note') : null;
+      if (!note) return;
+      const noteId = note.dataset.noteId;
+      if (!noteId) return;
+      this.openModal(noteId);
+    }
+
+    bindDragListeners() {
+      if (!this.handleNotePointerMoveBound) {
+        this.handleNotePointerMoveBound = (event) => this.handleNotePointerMove(event);
+      }
+      if (!this.handleNotePointerUpBound) {
+        this.handleNotePointerUpBound = (event) => this.handleNotePointerUp(event);
+      }
+      document.addEventListener('pointermove', this.handleNotePointerMoveBound);
+      document.addEventListener('pointerup', this.handleNotePointerUpBound);
+      document.addEventListener('pointercancel', this.handleNotePointerUpBound);
+    }
+
+    unbindDragListeners() {
+      if (!this.handleNotePointerMoveBound || !this.handleNotePointerUpBound) return;
+      document.removeEventListener('pointermove', this.handleNotePointerMoveBound);
+      document.removeEventListener('pointerup', this.handleNotePointerUpBound);
+      document.removeEventListener('pointercancel', this.handleNotePointerUpBound);
     }
 
     handleNotePointerMove(event) {
@@ -216,15 +237,19 @@
       });
       note.pos_x = next.posX;
       note.pos_y = next.posY;
-      this.render();
+      this.updateDraggedNotePosition(note);
       this.updateTrashTargetState(event.clientX, event.clientY);
     }
 
     async handleNotePointerUp(event) {
       if (!this.dragState || event.pointerId !== this.dragState.pointerId) return;
-      const noteId = this.dragState.noteId;
+      const { noteId, noteElement, pointerId } = this.dragState;
+      if (noteElement?.hasPointerCapture(pointerId)) {
+        noteElement.releasePointerCapture(pointerId);
+      }
       const note = this.notes.find((entry) => String(entry.id) === String(noteId));
       this.dragState = null;
+      this.unbindDragListeners();
       this.clearTrashTargetState();
 
       if (this.isOverTrash(event.clientX, event.clientY)) {
@@ -237,6 +262,17 @@
       }
       this.hideActionBar();
       this.render();
+    }
+
+    updateDraggedNotePosition(note) {
+      if (!this.canvas || !note) return;
+      const element = this.canvas.querySelector(`.dashboard-note[data-note-id="${CSS.escape(String(note.id))}"]`);
+      if (!element) {
+        this.render();
+        return;
+      }
+      element.style.left = `${Number(note.pos_x || 0)}px`;
+      element.style.top = `${Number(note.pos_y || 0)}px`;
     }
 
     updateTrashTargetState(clientX, clientY) {
