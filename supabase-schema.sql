@@ -90,6 +90,7 @@ create table if not exists public.projects (
   commission_number text not null,
   name text not null,
   allow_expenses boolean not null default true,
+  budget numeric(12,2) not null default 0,
   project_lead_profile_id uuid references public.app_profiles(id) on delete set null,
   construction_lead_profile_id uuid references public.app_profiles(id) on delete set null,
   created_at timestamptz not null default timezone('utc', now()),
@@ -354,6 +355,7 @@ create table if not exists public.projects (
   commission_number text not null,
   name text not null,
   allow_expenses boolean not null default true,
+  budget numeric(12,2) not null default 0,
   project_lead_profile_id uuid references public.app_profiles(id) on delete set null,
   construction_lead_profile_id uuid references public.app_profiles(id) on delete set null,
   created_at timestamptz not null default timezone('utc', now()),
@@ -492,25 +494,6 @@ drop column if exists disco_scheduled_for;
 alter table public.notes
 drop column if exists disco_done_at;
 
-create table if not exists public.project_disco_layers (
-  id uuid primary key default gen_random_uuid(),
-  project_id uuid not null references public.projects(id) on delete cascade,
-  week_start_date date not null,
-  profile_uid uuid not null references public.app_profiles(id) on delete cascade,
-  sort_order integer not null default 1,
-  created_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.project_disco_entries (
-  id uuid primary key default gen_random_uuid(),
-  project_id uuid not null references public.projects(id) on delete cascade,
-  note_id uuid not null references public.notes(id) on delete cascade,
-  layer_id uuid references public.project_disco_layers(id) on delete cascade,
-  plan_date date,
-  sort_order integer not null default 1,
-  created_at timestamptz not null default timezone('utc', now())
-);
-
 do $$
 begin
   if not exists (
@@ -534,10 +517,31 @@ add column if not exists construction_lead_profile_id uuid references public.app
 alter table public.projects
 add column if not exists allow_expenses boolean not null default true;
 
+alter table public.projects
+add column if not exists property_id uuid references public.properties(id) on delete set null;
+
+alter table public.projects
+add column if not exists budget numeric(12,2) not null default 0;
+
+
+create table if not exists public.project_kanban_notes (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  status text not null default 'todo' check (status in ('todo', 'planned', 'in_progress', 'review', 'done')),
+  position integer not null default 0,
+  content text not null,
+  progress_percent smallint not null default 0 check (progress_percent between 0 and 100),
+  checklist_history jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
 create unique index if not exists projects_commission_number_idx
 on public.projects (commission_number);
 
 drop table if exists public.project_assignments cascade;
+drop table if exists public.project_disco_entries cascade;
+drop table if exists public.project_disco_layers cascade;
 drop table if exists public.bot_profiles cascade;
 
 drop trigger if exists projects_set_updated_at on public.projects;
@@ -545,13 +549,17 @@ create trigger projects_set_updated_at
 before update on public.projects
 for each row execute function public.set_updated_at();
 
+drop trigger if exists project_kanban_notes_set_updated_at on public.project_kanban_notes;
+create trigger project_kanban_notes_set_updated_at
+before update on public.project_kanban_notes
+for each row execute function public.set_updated_at();
+
 alter table public.projects enable row level security;
 alter table public.crm_contacts enable row level security;
 alter table public.properties enable row level security;
 alter table public.notes enable row level security;
 alter table public.school_vacations enable row level security;
-alter table public.project_disco_layers enable row level security;
-alter table public.project_disco_entries enable row level security;
+alter table public.project_kanban_notes enable row level security;
 
 drop policy if exists "projects own or admin" on public.projects;
 create policy "projects own or admin"
@@ -585,25 +593,17 @@ to authenticated
 using (public.is_admin_user())
 with check (public.is_admin_user());
 
+drop policy if exists "project_kanban_notes admin access" on public.project_kanban_notes;
+create policy "project_kanban_notes admin access"
+on public.project_kanban_notes
+for all
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
 drop policy if exists "school_vacations admin access" on public.school_vacations;
 create policy "school_vacations admin access"
 on public.school_vacations
-for all
-to authenticated
-using (public.is_admin_user())
-with check (public.is_admin_user());
-
-drop policy if exists "project_disco_layers admin access" on public.project_disco_layers;
-create policy "project_disco_layers admin access"
-on public.project_disco_layers
-for all
-to authenticated
-using (public.is_admin_user())
-with check (public.is_admin_user());
-
-drop policy if exists "project_disco_entries admin access" on public.project_disco_entries;
-create policy "project_disco_entries admin access"
-on public.project_disco_entries
 for all
 to authenticated
 using (public.is_admin_user())
@@ -676,8 +676,7 @@ create index if not exists daily_assignments_profile_date_idx on public.daily_as
 create index if not exists crm_contacts_last_name_idx on public.crm_contacts (last_name, first_name);
 create index if not exists properties_contact_created_idx on public.properties (contact_id, created_at desc);
 create index if not exists notes_target_uid_created_at_idx on public.notes (target_uid, created_at desc);
-create index if not exists project_disco_layers_project_week_idx on public.project_disco_layers (project_id, week_start_date, sort_order);
-create index if not exists project_disco_entries_project_note_idx on public.project_disco_entries (project_id, note_id);
+create index if not exists project_kanban_notes_project_status_idx on public.project_kanban_notes (project_id, status, position);
 
 drop trigger if exists set_updated_at_app_profiles on public.app_profiles;
 create trigger set_updated_at_app_profiles

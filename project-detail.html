@@ -6,11 +6,9 @@
     <title>Auftrag</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./project-detail.css" />
+    <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script defer src="./project-detail.js"></script>
   </head>
   <body>
@@ -31,9 +29,30 @@
       </aside>
 
       <main class="detail-content">
-        <section class="placeholder-area" aria-label="Auftragsinhalt Platzhalter">
-          <p id="projectMeta" class="placeholder-meta"></p>
-          <div class="placeholder-spacer"></div>
+        <section class="detail-panel" aria-label="Auftragsinhalt">
+          <header class="detail-header">
+            <div>
+              <h1 id="projectTitle">Auftrag</h1>
+              <p id="projectMeta" class="project-meta"></p>
+            </div>
+            <div id="projectBudget" class="budget-pill">Budget: –</div>
+          </header>
+
+          <div id="alert" class="alert hidden"></div>
+
+          <form id="noteForm" class="note-form">
+            <label for="noteText">Neue Karte</label>
+            <textarea id="noteText" rows="3" placeholder="Notiztext oder To-Do-Liste …" required></textarea>
+            <div class="note-form-row">
+              <label>
+                Fortschritt (%)
+                <input id="noteProgress" type="number" min="0" max="100" value="0" />
+              </label>
+              <button class="button-primary" type="submit">Karte hinzufügen</button>
+            </div>
+          </form>
+
+          <section class="kanban-board" id="kanbanBoard" aria-label="Kanban Board"></section>
         </section>
       </main>
     </div>
