@@ -456,6 +456,11 @@
     }
 
     clearSelection() {
+      const hasActiveSelection = this.activeNoteId !== null && this.activeNoteId !== undefined;
+      const isActionBarVisible = Boolean(this.actionBar?.classList.contains('visible'));
+      if (!hasActiveSelection && !isActionBarVisible) {
+        return;
+      }
       this.activeNoteId = null;
       this.hideActionBar();
       this.render();
