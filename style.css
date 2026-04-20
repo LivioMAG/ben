@@ -942,12 +942,15 @@ tbody tr:hover {
   padding: 12px;
   position: relative;
   min-height: calc(100vh - 52px);
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .notes-dashboard-canvas {
   position: relative;
-  min-height: 100%;
+  flex: 1;
+  min-height: 0;
   border: 1px solid rgba(17, 17, 17, 0.08);
   border-radius: 18px;
   overflow: hidden;
@@ -955,7 +958,7 @@ tbody tr:hover {
     linear-gradient(rgba(17, 17, 17, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(17, 17, 17, 0.03) 1px, transparent 1px),
     rgba(255, 255, 255, 0.7);
-  background-size: 24px 24px;
+  background-size: 8px 8px;
 }
 
 .dashboard-note-empty {
@@ -1030,10 +1033,10 @@ tbody tr:hover {
 }
 
 .notes-dashboard-action-bar {
-  position: sticky;
-  bottom: 14px;
-  margin-top: 16px;
-  transform: translateY(120%);
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translate(-50%, 120%);
   opacity: 0;
   pointer-events: none;
   transition: transform 0.2s ease, opacity 0.2s ease;
@@ -1044,10 +1047,11 @@ tbody tr:hover {
   border-radius: 18px;
   border: 1px solid rgba(17, 17, 17, 0.08);
   background: rgba(255, 255, 255, 0.95);
+  z-index: 22;
 }
 
 .notes-dashboard-action-bar.visible {
-  transform: translateY(0);
+  transform: translate(-50%, 0);
   opacity: 1;
   pointer-events: auto;
 }
