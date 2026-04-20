@@ -2,7 +2,7 @@
   const DASHBOARD_TABLE = 'dashboard_notes';
   const ATTACHMENTS_TABLE = 'dashboard_note_attachments';
   const STORAGE_BUCKET = 'dashboard-note-attachments';
-  const GRID_SIZE = 24;
+  const GRID_SIZE = 8;
   const DEFAULT_NOTE_WIDTH = 168;
   const DEFAULT_NOTE_HEIGHT = 120;
   const CARD_PREVIEW_MAX_LENGTH = 80;
