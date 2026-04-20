@@ -642,6 +642,8 @@ const state = {
   dispoAssignContext: null,
   dispoAllowMultiplePerDay: true,
   selectedProjectId: null,
+  dispoGapProjectId: '',
+  pendingDeepLink: null,
   employeeFilterQuery: '',
   selectedEmployeeIds: [],
   employeeSelectionInitialized: false,
@@ -700,8 +702,11 @@ async function init() {
     elements.adminSqlPreview.textContent = ADMIN_SQL_SNIPPET;
   }
 
+  state.pendingDeepLink = parseDeepLinkFromLocation();
+
   await initializeSupabase();
   await bootstrapSession();
+  applyPendingDeepLink();
   render();
 }
 
@@ -1002,6 +1007,8 @@ function bindEvents() {
   elements.dispoTableHead.addEventListener('click', handleDispoTableClick);
   elements.dispoExportPdfButton.addEventListener('click', exportDispoPdf);
   elements.dispoGapSearchButton.addEventListener('click', openDispoGapSearchModal);
+  elements.dispoGapResults?.addEventListener('click', handleDispoGapResultsClick);
+  elements.dispoGapModalResults?.addEventListener('click', handleDispoGapResultsClick);
   if (elements.dispoGapSearchForm) {
     elements.dispoGapSearchForm.addEventListener('submit', handleDispoGapSearchSubmit);
   }
@@ -4984,7 +4991,7 @@ function renderProjectsTable() {
   if (!elements.projectsTableBody) return;
   const rows = getFilteredProjects();
   if (!rows.length) {
-    elements.projectsTableBody.innerHTML = '<tr><td colspan="5" class="empty-state">Keine Aufträge vorhanden.</td></tr>';
+    elements.projectsTableBody.innerHTML = '<tr><td colspan="6" class="empty-state">Keine Aufträge vorhanden.</td></tr>';
     return;
   }
   elements.projectsTableBody.innerHTML = rows.map((project) => {
@@ -4992,7 +4999,8 @@ function renderProjectsTable() {
     return `<tr class="project-row-clickable" data-action="open-project-detail" data-project-id="${escapeAttribute(project.id)}">
       <td>${escapeHtml(project.name || '—')}</td>
       <td>${escapeHtml(project.commission_number || '')}</td>
-      <td>${renderProjectScheduleCell(scheduleStatus)}</td>
+      <td>${escapeHtml(scheduleStatus.lastAssignmentDate ? formatDate(scheduleStatus.lastAssignmentDate) : '—')}</td>
+      <td>${escapeHtml(scheduleStatus.nextAssignmentDate ? formatDate(scheduleStatus.nextAssignmentDate) : '—')}</td>
       <td><span class="pill ${project.allow_expenses === false ? 'warning' : 'success'}">${project.allow_expenses === false ? 'Nein' : 'Ja'}</span></td>
       <td>
         <div class="table-row-actions">
@@ -5002,17 +5010,6 @@ function renderProjectsTable() {
       </td>
     </tr>`;
   }).join('');
-}
-
-function renderProjectScheduleCell(scheduleStatus = {}) {
-  const lastAssignmentLabel = scheduleStatus.lastAssignmentDate ? formatDate(scheduleStatus.lastAssignmentDate) : '—';
-  const nextAssignmentLabel = scheduleStatus.nextAssignmentDate ? formatDate(scheduleStatus.nextAssignmentDate) : '—';
-  return `
-    <div class="status-stack compact">
-      <span><strong>Letzter Einsatz:</strong> ${escapeHtml(lastAssignmentLabel)}</span>
-      <span><strong>Geplanter Einsatz:</strong> ${escapeHtml(nextAssignmentLabel)}</span>
-    </div>
-  `;
 }
 
 function getProjectScheduleStatus(project) {
@@ -5198,6 +5195,12 @@ function openDispoGapSearchModal() {
     elements.dispoGapModalResults.innerHTML = '';
     elements.dispoGapModalResults.classList.add('hidden');
   }
+  if (state.dispoGapProjectId) {
+    const selectedProject = state.projects.find((project) => String(project.id) === String(state.dispoGapProjectId));
+    if (selectedProject) {
+      showInlineAlert(elements.dispoAlert, `Lückensuche für Auftrag aktiv: ${`${selectedProject.commission_number || ''} ${selectedProject.name || ''}`.trim()}`, false);
+    }
+  }
   elements.dispoGapSearchModal.classList.remove('hidden');
 }
 
@@ -5317,6 +5320,7 @@ function findDispoAvailabilityGaps({
         .filter((interval) => (interval.end - interval.start) >= minimumGapMinutes);
       for (const interval of freeIntervals) {
         matches.push({
+          profileId: String(profile.id),
           profileName: profile.full_name || profile.email || 'Unbekannt',
           date,
           start: interval.start,
@@ -5396,13 +5400,29 @@ function renderDispoGapSearchResults({ matches, weekLabel, minimumHours, windowL
     return;
   }
   const rows = matches
-    .map((match) => `<li><strong>${escapeHtml(match.profileName)}</strong> – ${escapeHtml(getWeekdayLabel(match.date))}, ${escapeHtml(formatDate(match.date))}: ${
+    .map((match) => `<li class="dispo-gap-result-item"><span><strong>${escapeHtml(match.profileName)}</strong> – ${escapeHtml(getWeekdayLabel(match.date))}, ${escapeHtml(formatDate(match.date))}: ${
       match.isFullDay ? 'Ganzer Tag frei' : `${escapeHtml(minutesToTimeLabel(match.start))} – ${escapeHtml(minutesToTimeLabel(match.end))} frei`
-    }</li>`)
+    }</span><button class="button button-small button-primary" type="button" data-action="book-gap-slot" data-profile-id="${escapeAttribute(match.profileId)}" data-date="${escapeAttribute(match.date)}" data-start="${escapeAttribute(minutesToTimeLabel(match.start))}" data-end="${escapeAttribute(minutesToTimeLabel(match.end))}">Buchen</button></li>`)
     .join('');
   targetElement.innerHTML = `<h4>Freie Lücken (${escapeHtml(weekLabel)})</h4>
     <p class="subtle-text">Zeitfenster: ${escapeHtml(windowLabel)} · Mindestlücke: ${escapeHtml(String(minimumHours))}h</p>
     <ul>${rows}</ul>`;
+}
+
+
+function handleDispoGapResultsClick(event) {
+  const button = event.target.closest('button[data-action="book-gap-slot"]');
+  if (!button) return;
+  const profileId = String(button.dataset.profileId || '').trim();
+  const date = String(button.dataset.date || '').trim();
+  if (!profileId || !date) return;
+  openDispoAssignModal({
+    targets: [{ profileId, date }],
+    label: `Lücke buchen: ${getProfileById(profileId)?.full_name || profileId} · ${formatDate(date)}`,
+    prefillProjectId: state.dispoGapProjectId || '',
+    prefillStartTime: String(button.dataset.start || ''),
+    prefillEndTime: String(button.dataset.end || ''),
+  });
 }
 
 function getServiceProfiles() {
@@ -5748,6 +5768,43 @@ function openProjectDetail(projectId) {
   window.location.href = detailUrl.toString();
 }
 
+
+function parseDeepLinkFromLocation() {
+  const params = new URLSearchParams(window.location.search);
+  const page = String(params.get('page') || '').trim();
+  if (!page) return null;
+  const deepLink = { page };
+  if (page === 'dispo') {
+    deepLink.gapSearch = params.get('gapSearch') === '1';
+    deepLink.projectId = String(params.get('projectId') || '').trim();
+    deepLink.week = String(params.get('week') || '').trim();
+  }
+  return deepLink;
+}
+
+function applyPendingDeepLink() {
+  if (!state.pendingDeepLink) return;
+  const deepLink = state.pendingDeepLink;
+  state.pendingDeepLink = null;
+  if (deepLink.page) {
+    setCurrentPage(deepLink.page);
+  }
+  if (deepLink.page === 'dispo') {
+    if (deepLink.week) {
+      state.selectedWeek = deepLink.week;
+      if (elements.weekPicker) elements.weekPicker.value = deepLink.week;
+      renderDispoPlanner();
+    }
+    state.dispoGapProjectId = deepLink.projectId || '';
+    if (deepLink.gapSearch) {
+      openDispoGapSearchModal();
+      if (elements.dispoGapWeekFromInput && !elements.dispoGapWeekFromInput.value) {
+        elements.dispoGapWeekFromInput.value = state.selectedWeek;
+      }
+    }
+  }
+}
+
 function openCrmContactDetailPage(contact) {
   if (!contact?.id) return;
   const detailUrl = new URL('./crm-contact-detail.html', window.location.href);
@@ -5980,7 +6037,7 @@ function isWeekendDate(date) {
   return day === 0 || day === 6;
 }
 
-function openDispoAssignModal({ targets, label }) {
+function openDispoAssignModal({ targets, label, prefillProjectId = '', prefillStartTime = '', prefillEndTime = '' }) {
   const editableTargets = (targets || []).filter((target) => !isWeeklyReportLocked(target.profileId, target.date));
   if (!editableTargets.length) {
     showInlineAlert(elements.dispoAlert, 'Vergangene Tage können in der Dispo nicht mehr bearbeitet werden.', true);
@@ -5993,10 +6050,13 @@ function openDispoAssignModal({ targets, label }) {
     const rightLabel = `${right.commission_number || ''} ${right.name || ''}`.trim().toLowerCase();
     return leftLabel.localeCompare(rightLabel, 'de');
   });
-  elements.dispoAssignProjectsList.innerHTML = `<table class="dispo-select-table"><thead><tr><th>Projekte</th><th>Auswahl</th></tr></thead><tbody>${sortedProjects.map((project, index) => `<tr><td>${escapeHtml(`${project.commission_number || ''} ${project.name || ''}`.trim())}</td><td><input type="radio" name="dispoAssignChoice" value="project:${escapeAttribute(project.id)}" ${index === 0 ? 'checked' : ''} /></td></tr>`).join('')}</tbody></table>`;
+  elements.dispoAssignProjectsList.innerHTML = `<table class="dispo-select-table"><thead><tr><th>Projekte</th><th>Auswahl</th></tr></thead><tbody>${sortedProjects.map((project, index) => {
+    const isChecked = prefillProjectId ? String(project.id) === String(prefillProjectId) : index === 0;
+    return `<tr><td>${escapeHtml(`${project.commission_number || ''} ${project.name || ''}`.trim())}</td><td><input type="radio" name="dispoAssignChoice" value="project:${escapeAttribute(project.id)}" ${isChecked ? 'checked' : ''} /></td></tr>`;
+  }).join('')}</tbody></table>`;
   elements.dispoAssignSpecialList.innerHTML = '<p class="subtle-text">Nur Projekt-Zuweisungen verfügbar.</p>';
-  elements.dispoAssignStartTime.value = DISPO_DEFAULT_START_TIME;
-  elements.dispoAssignEndTime.value = DISPO_DEFAULT_END_TIME;
+  elements.dispoAssignStartTime.value = normalizeDispoTimeValue(prefillStartTime, DISPO_DEFAULT_START_TIME);
+  elements.dispoAssignEndTime.value = normalizeDispoTimeValue(prefillEndTime, DISPO_DEFAULT_END_TIME);
   if (!state.projects.length) {
     showInlineAlert(elements.dispoAlert, 'Keine Projekte vorhanden. Bitte zuerst ein Projekt erfassen.', true);
     return;

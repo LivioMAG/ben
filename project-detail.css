@@ -98,6 +98,29 @@ body {
 
 .board-hint { margin: 8px 0 14px; color: rgba(15, 23, 42, 0.58); font-size: 14px; }
 
+.project-schedule-panel {
+  margin: 12px 0 14px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(248, 250, 252, 0.9);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.project-schedule-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(130px, 1fr));
+}
+
+.project-schedule-grid strong {
+  display: block;
+  margin-top: 2px;
+}
+
 .button-primary,
 .button-secondary,
 .button-danger {
