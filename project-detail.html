@@ -43,54 +43,33 @@
 
           <div id="alert" class="alert hidden"></div>
 
-          <p class="board-hint">Direkte Bearbeitung in den Karten. Für Verlauf &amp; Details eine Notiz antippen.</p>
+          <p class="board-hint">Direkte Bearbeitung in den Karten – ohne Seitenpanel.</p>
           <section class="kanban-board" id="kanbanBoard" aria-label="Kanban Board"></section>
         </section>
       </main>
     </div>
 
-    <aside id="notePanel" class="slide-panel hidden" aria-label="Notiz Details">
-      <div id="notePanelBackdrop" class="slide-backdrop"></div>
-      <section class="slide-card">
-        <header class="slide-header">
-          <button id="closePanelButton" class="icon-action" type="button" title="Schliessen" aria-label="Schliessen">✕</button>
+    <div id="noteTypeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="noteTypeModalTitle">
+      <div id="noteTypeModalBackdrop" class="modal-backdrop"></div>
+      <div class="modal-card note-type-modal-card">
+        <header class="modal-header">
+          <h2 id="noteTypeModalTitle">Notiztyp wählen</h2>
+          <button id="closeNoteTypeModalButton" class="icon-action" type="button" aria-label="Schliessen">✕</button>
         </header>
-        <form id="createNoteForm" class="create-note-form hidden">
-          <label>
-            Typ
-            <select id="newNoteType" required>
-              <option value="text">Notiz</option>
-              <option value="todo">To-do-Notiz</option>
-              <option value="counter">Counter-Notiz</option>
-            </select>
-          </label>
-          <label data-type-field="text" data-type="text">
-            Beschreibung
-            <textarea id="newNoteText" rows="3" placeholder="Beschreibung"></textarea>
-          </label>
-          <label data-type-field="todo" data-type="todo" class="hidden">
-            Beschreibung (optional)
-            <textarea id="newTodoDescription" rows="2" placeholder="Beschreibung für diese To-do-Notiz"></textarea>
-          </label>
-          <label data-type-field="todo" data-type="todo" class="hidden">
-            Erstes To-do (optional)
-            <input id="newTodoItem" type="text" maxlength="180" placeholder="Ersten Punkt hinzufügen" />
-          </label>
-          <label data-type-field="counter" data-type="counter" class="hidden">
-            Beschreibung (pflichtig)
-            <textarea id="newCounterDescription" rows="2" placeholder="Beschreibung"></textarea>
-          </label>
-          <label data-type-field="counter" data-type="counter" class="hidden">
-            Zielwert
-            <input id="newCounterStart" type="number" step="1" value="1" min="1" />
-          </label>
-          <div class="form-actions">
-            <button class="button-primary" type="submit">Notiz erstellen</button>
-          </div>
-        </form>
-        <div id="panelContent" class="panel-content"></div>
-      </section>
-    </aside>
+        <div id="noteTypeOptions" class="note-type-options"></div>
+      </div>
+    </div>
+
+    <div id="attachmentModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="attachmentModalTitle">
+      <div id="attachmentModalBackdrop" class="modal-backdrop"></div>
+      <div class="modal-card attachment-modal-card">
+        <header class="modal-header">
+          <h2 id="attachmentModalTitle">Anhänge</h2>
+          <button id="closeAttachmentModalButton" class="icon-action" type="button" aria-label="Schliessen">✕</button>
+        </header>
+        <div id="attachmentModalContent"></div>
+      </div>
+    </div>
 
     <div id="documentsModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="documentsModalTitle">
       <div id="documentsModalBackdrop" class="modal-backdrop"></div>
