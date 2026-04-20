@@ -1,6 +1,7 @@
 const STORAGE_BUCKET = 'weekly-attachments';
 const CRM_NOTE_STORAGE_BUCKET = 'crm-note-attachments';
 const PROPERTY_DOCUMENT_STORAGE_BUCKET = 'crm-note-attachments';
+const MATERIAL_STORAGE_BUCKET = 'material-belege';
 const CONFIG_PATH = './supabase-config.json';
 const HOLIDAY_TABLE = 'platform_holidays';
 const NOTES_TABLE = 'notes';
@@ -625,6 +626,7 @@ const state = {
   crmContacts: [],
   crmNotes: [],
   properties: [],
+  materialEntries: [],
   selectedCrmContactId: null,
   selectedPropertyId: null,
   crmSearchQuery: '',
@@ -665,6 +667,7 @@ const state = {
   isSavingConfirmation: false,
   isSavingSaldo: false,
   isSavingSettings: false,
+  isSavingMaterial: false,
   editingHolidayId: null,
   isLoadingOverlayVisible: false,
   loadingOverlayReason: '',
@@ -786,6 +789,7 @@ function cacheElements() {
     dispo: document.getElementById('dispoPage'),
     crm: document.getElementById('crmPage'),
     properties: document.getElementById('propertiesPage'),
+    material: document.getElementById('materialPage'),
     settings: document.getElementById('settingsPage'),
   };
   elements.projectForm = document.getElementById('projectForm');
@@ -906,6 +910,16 @@ function cacheElements() {
   elements.propertyDetailNoteForm = document.getElementById('propertyDetailNoteForm');
   elements.backToPropertiesListButton = document.getElementById('backToPropertiesListButton');
   elements.editPropertyFromDetailButton = document.getElementById('editPropertyFromDetailButton');
+  elements.materialAlert = document.getElementById('materialAlert');
+  elements.materialTableBody = document.getElementById('materialTableBody');
+  elements.openMaterialModalButton = document.getElementById('openMaterialModalButton');
+  elements.materialModal = document.getElementById('materialModal');
+  elements.closeMaterialModalButton = document.getElementById('closeMaterialModalButton');
+  elements.materialForm = document.getElementById('materialForm');
+  elements.materialKommissionsnummerInput = document.getElementById('materialKommissionsnummerInput');
+  elements.materialBelegInput = document.getElementById('materialBelegInput');
+  elements.materialBetragInput = document.getElementById('materialBetragInput');
+  elements.materialBeschreibungInput = document.getElementById('materialBeschreibungInput');
 }
 
 function bindEvents() {
@@ -1125,6 +1139,22 @@ function bindEvents() {
   }
   if (elements.propertyDocumentForm) {
     elements.propertyDocumentForm.addEventListener('submit', handlePropertyDetailDocumentSubmit);
+  }
+  if (elements.openMaterialModalButton) {
+    elements.openMaterialModalButton.addEventListener('click', openMaterialModal);
+  }
+  if (elements.closeMaterialModalButton) {
+    elements.closeMaterialModalButton.addEventListener('click', closeMaterialModal);
+  }
+  if (elements.materialForm) {
+    elements.materialForm.addEventListener('submit', handleMaterialSubmit);
+  }
+  if (elements.materialModal) {
+    elements.materialModal.addEventListener('click', (event) => {
+      if (event.target?.dataset?.closeMaterialModal === 'true') {
+        closeMaterialModal();
+      }
+    });
   }
   document.addEventListener('keydown', handleGlobalKeydown);
   window.addEventListener('focus', handleWindowFocus);
@@ -1477,6 +1507,7 @@ async function loadData() {
       state.crmContacts = [];
       state.crmNotes = [];
       state.properties = [];
+      state.materialEntries = [];
       state.selectedCrmContactId = null;
       elements.dataTimestamp.textContent = 'Kein Zugriff – is_admin ist für dieses Profil nicht aktiviert';
       finishDataLoad(requestId);
@@ -1544,6 +1575,10 @@ async function loadData() {
       .from(PROPERTIES_TABLE)
       .select('*')
       .order('created_at', { ascending: false });
+    const materialEntriesQuery = state.supabase
+      .from('material_entries')
+      .select('*')
+      .order('created_at', { ascending: false });
     const [
       { data: reports, error: reportsError },
       { data: profiles, error: profilesError },
@@ -1556,6 +1591,7 @@ async function loadData() {
       { data: crmContacts, error: crmContactsError },
       { data: crmNotes, error: crmNotesError },
       { data: properties, error: propertiesError },
+      { data: materialEntries, error: materialEntriesError },
     ] = await Promise.all([
       reportsQuery,
       profilesQuery,
@@ -1568,6 +1604,7 @@ async function loadData() {
       crmContactsQuery,
       crmNotesQuery,
       propertiesQuery,
+      materialEntriesQuery,
     ]);
 
     if (reportsError) throw reportsError;
@@ -1581,6 +1618,7 @@ async function loadData() {
     if (crmContactsError && !isMissingTableError(crmContactsError, 'crm_contacts')) throw crmContactsError;
     if (crmNotesError && !isMissingTableError(crmNotesError, NOTES_TABLE)) throw crmNotesError;
     if (propertiesError && !isMissingTableError(propertiesError, PROPERTIES_TABLE)) throw propertiesError;
+    if (materialEntriesError && !isMissingTableError(materialEntriesError, 'material_entries')) throw materialEntriesError;
     if (!isActiveDataLoad(requestId)) {
       return;
     }
@@ -1596,6 +1634,7 @@ async function loadData() {
     state.crmContacts = crmContacts ?? [];
     state.crmNotes = crmNotes ?? [];
     state.properties = properties ?? [];
+    state.materialEntries = materialEntries ?? [];
     if (state.selectedCrmContactId && !state.crmContacts.some((item) => String(item.id) === String(state.selectedCrmContactId))) {
       state.selectedCrmContactId = null;
     }
@@ -1753,6 +1792,7 @@ function render() {
   renderCrmNotesPanel();
   renderPropertyContactOptions();
   renderPropertiesTable();
+  renderMaterialTable();
   renderPropertyDetail();
   renderLoadingOverlay();
 }
@@ -1825,6 +1865,7 @@ function renderPages() {
     dispo: 'Dispo / Wochenplanung',
     crm: 'CRM',
     properties: 'Immobilien',
+    material: 'Material',
     settings: 'Einstellungen',
   };
 
@@ -3372,6 +3413,104 @@ function openSelectedPropertyForEdit() {
   openPropertyModal(property);
 }
 
+function resetMaterialForm() {
+  if (elements.materialForm) {
+    elements.materialForm.reset();
+  }
+}
+
+function openMaterialModal() {
+  if (!elements.materialModal) return;
+  resetMaterialForm();
+  elements.materialModal.classList.remove('hidden');
+}
+
+function closeMaterialModal() {
+  if (!elements.materialModal) return;
+  elements.materialModal.classList.add('hidden');
+}
+
+async function uploadMaterialReceipt(file, kommissionsnummer) {
+  if (!(file instanceof File)) {
+    throw new Error('Bitte einen Beleg auswählen.');
+  }
+  if (!state.supabase) {
+    throw new Error('Keine Verbindung zu Supabase.');
+  }
+
+  const safeKommissionsnummer = String(kommissionsnummer || 'ohne-kommission')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .slice(0, 80) || 'ohne-kommission';
+  const safeName = String(file.name || 'beleg')
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .slice(0, 120) || 'beleg';
+  const path = `material/${safeKommissionsnummer}/${Date.now()}-${crypto.randomUUID()}-${safeName}`;
+  const { error } = await state.supabase.storage.from(MATERIAL_STORAGE_BUCKET).upload(path, file, {
+    upsert: false,
+    contentType: file.type || 'application/octet-stream',
+  });
+  if (error) throw error;
+  const { data } = state.supabase.storage.from(MATERIAL_STORAGE_BUCKET).getPublicUrl(path);
+  return {
+    belegUrl: String(data?.publicUrl || '').trim(),
+    belegName: file.name || safeName,
+  };
+}
+
+async function handleMaterialSubmit(event) {
+  event.preventDefault();
+  if (!state.supabase || state.isSavingMaterial) return;
+
+  const kommissionsnummer = String(elements.materialKommissionsnummerInput?.value || '').trim();
+  const betrag = Number(elements.materialBetragInput?.value || 0);
+  const beschreibung = String(elements.materialBeschreibungInput?.value || '').trim();
+  const file = elements.materialBelegInput?.files?.[0];
+
+  if (!kommissionsnummer || Number.isNaN(betrag) || betrag <= 0 || !(file instanceof File)) {
+    showInlineAlert(elements.materialAlert, 'Bitte Kommissionsnummer, Beleg und gültigen Betrag ausfüllen.', true);
+    return;
+  }
+
+  state.isSavingMaterial = true;
+  if (elements.openMaterialModalButton) {
+    elements.openMaterialModalButton.disabled = true;
+  }
+  if (elements.materialForm) {
+    const submitButton = elements.materialForm.querySelector('button[type="submit"]');
+    if (submitButton) submitButton.disabled = true;
+  }
+
+  try {
+    const upload = await uploadMaterialReceipt(file, kommissionsnummer);
+    const payload = {
+      kommissionsnummer,
+      betrag,
+      beleg_url: upload.belegUrl,
+      beleg_name: upload.belegName,
+      beschreibung: beschreibung || null,
+    };
+    const { error } = await state.supabase.from('material_entries').insert(payload);
+    if (error) throw error;
+    closeMaterialModal();
+    showInlineAlert(elements.materialAlert, 'Material-Eintrag gespeichert.', false);
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    showInlineAlert(elements.materialAlert, `Material konnte nicht gespeichert werden: ${error.message}`, true);
+  } finally {
+    state.isSavingMaterial = false;
+    if (elements.openMaterialModalButton) {
+      elements.openMaterialModalButton.disabled = false;
+    }
+    if (elements.materialForm) {
+      const submitButton = elements.materialForm.querySelector('button[type="submit"]');
+      if (submitButton) submitButton.disabled = false;
+    }
+  }
+}
+
 async function uploadPropertyDocuments(propertyId, files) {
   const uploadFiles = Array.from(files || []).filter((file) => file instanceof File);
   if (!uploadFiles.length) return [];
@@ -4547,6 +4686,33 @@ function renderPropertiesTable() {
         </div>
       </td>
     </tr>`;
+  }).join('');
+}
+
+function renderMaterialTable() {
+  if (!elements.materialTableBody) return;
+
+  const entries = Array.isArray(state.materialEntries) ? state.materialEntries : [];
+  if (!entries.length) {
+    elements.materialTableBody.innerHTML = '<tr><td colspan="4">Noch keine Material-Einträge erfasst.</td></tr>';
+    return;
+  }
+
+  elements.materialTableBody.innerHTML = entries.map((entry) => {
+    const belegName = String(entry.beleg_name || 'Beleg');
+    const belegUrl = String(entry.beleg_url || '').trim();
+    const belegMarkup = belegUrl
+      ? `<a href="${escapeAttribute(buildForcedDownloadUrl(belegUrl, belegName))}" target="_blank" rel="noreferrer">${escapeHtml(belegName)}</a>`
+      : 'Datei vorhanden';
+    const beschreibung = String(entry.beschreibung || '').trim();
+    return `
+      <tr>
+        <td>${escapeHtml(String(entry.kommissionsnummer || '–'))}</td>
+        <td>${formatCurrency(entry.betrag)}</td>
+        <td>${belegMarkup}</td>
+        <td>${beschreibung ? escapeHtml(beschreibung) : '–'}</td>
+      </tr>
+    `;
   }).join('');
 }
 
@@ -5775,6 +5941,10 @@ function handleGlobalKeydown(event) {
   }
   if (elements.dispoAssignModal && !elements.dispoAssignModal.classList.contains('hidden')) {
     closeDispoAssignModal();
+    return;
+  }
+  if (elements.materialModal && !elements.materialModal.classList.contains('hidden')) {
+    closeMaterialModal();
     return;
   }
   if (elements.projectModal && !elements.projectModal.classList.contains('hidden')) {
