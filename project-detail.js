@@ -21,7 +21,6 @@ const state = {
   activeNoteId: null,
   activeColumnKey: null,
   panelMode: 'note',
-  panelTab: 'details',
 };
 
 const elements = {};
@@ -59,8 +58,6 @@ function cacheElements() {
   elements.notePanel = document.getElementById('notePanel');
   elements.notePanelBackdrop = document.getElementById('notePanelBackdrop');
   elements.closePanelButton = document.getElementById('closePanelButton');
-  elements.panelTitle = document.getElementById('panelTitle');
-  elements.panelTabs = Array.from(document.querySelectorAll('.slide-tab'));
   elements.panelContent = document.getElementById('panelContent');
 
   elements.createNoteForm = document.getElementById('createNoteForm');
@@ -93,13 +90,13 @@ function bindEvents() {
 
   elements.closePanelButton?.addEventListener('click', closePanel);
   elements.notePanelBackdrop?.addEventListener('click', closePanel);
-  elements.panelTabs.forEach((tab) => tab.addEventListener('click', () => switchPanelTab(tab.dataset.tab)));
   elements.newNoteType?.addEventListener('change', updateCreateTypeFields);
   elements.createNoteForm?.addEventListener('submit', handleCreateNote);
   elements.kanbanBoard?.addEventListener('change', handleBoardChange);
   elements.kanbanBoard?.addEventListener('keydown', handleBoardKeydown);
   elements.panelContent?.addEventListener('click', handlePanelClick);
   elements.panelContent?.addEventListener('change', handlePanelChange);
+  elements.panelContent?.addEventListener('keydown', handlePanelKeydown);
 
   elements.openDocumentsButton?.addEventListener('click', openDocumentsModal);
   elements.closeDocumentsModalButton?.addEventListener('click', closeDocumentsModal);
@@ -261,19 +258,17 @@ function openCreatePanel(columnKey) {
   state.activeColumnKey = columnKey;
   state.activeNoteId = null;
   state.panelMode = 'create';
-  state.panelTab = 'details';
   elements.notePanel?.classList.remove('hidden');
   renderPanel();
 }
 
-function openNotePanel(noteId, tab = 'details') {
+function openNotePanel(noteId) {
   if (!noteId) return;
   const note = state.notes.find((entry) => String(entry.id) === String(noteId));
   if (!note) return;
   state.activeNoteId = noteId;
   state.activeColumnKey = String(note.status || '').trim();
   state.panelMode = 'note';
-  state.panelTab = tab;
   elements.notePanel?.classList.remove('hidden');
   renderPanel();
 }
@@ -282,7 +277,6 @@ function closePanel() {
   state.activeColumnKey = null;
   state.activeNoteId = null;
   state.panelMode = 'note';
-  state.panelTab = 'details';
   elements.notePanel?.classList.add('hidden');
 }
 
@@ -320,8 +314,6 @@ function renderPanel() {
   const note = state.notes.find((entry) => String(entry.id) === String(state.activeNoteId));
   const isCreate = state.panelMode === 'create';
   elements.createNoteForm?.classList.toggle('hidden', !isCreate);
-  elements.panelTabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.tab === state.panelTab));
-  elements.panelTitle.textContent = isCreate ? `Neue Notiz · ${getColumnMeta(state.activeColumnKey).label}` : `${getTypeLabel(getNoteType(note || {}))} · ${getColumnMeta(note?.status || '').label}`;
 
   if (isCreate) {
     elements.panelContent.innerHTML = '<p class="modal-empty">Notiztyp wählen, Inhalte erfassen und speichern.</p>';
@@ -331,77 +323,103 @@ function renderPanel() {
     elements.panelContent.innerHTML = '<p class="modal-empty">Notiz nicht gefunden.</p>';
     return;
   }
-
-  if (state.panelTab === 'activity') {
-    elements.panelContent.innerHTML = renderActivityTab(note);
-    return;
-  }
-  if (state.panelTab === 'documents') {
-    elements.panelContent.innerHTML = renderDocumentsTab(note);
-    return;
-  }
-  elements.panelContent.innerHTML = renderDetailsTab(note);
+  elements.panelContent.innerHTML = renderUnifiedPanel(note);
 }
 
-function renderDetailsTab(note) {
+function renderUnifiedPanel(note) {
   const type = getNoteType(note);
-  if (type === 'todo') {
-    return `
-      <article class="note-card" data-note-id="${escapeAttribute(note.id)}">
-        <label>Beschreibung
-          <textarea rows="4" data-field="todo-description" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.todo_description || '')}</textarea>
-        </label>
-        <button type="button" class="button-secondary" data-action="save-todo-meta" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
-      </article>
-    `;
-  }
-  if (type === 'counter') {
-    return `
-      <article class="note-card" data-note-id="${escapeAttribute(note.id)}">
-        <label>Beschreibung
-          <textarea rows="4" data-field="counter-description" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.counter_description || '')}</textarea>
-        </label>
-        <button type="button" class="button-secondary" data-action="save-counter-meta" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
-      </article>
-    `;
-  }
+  const noteId = escapeAttribute(note.id);
+  const descriptionField = type === 'text' ? 'content' : type === 'todo' ? 'todo-description' : 'counter-description';
+  const descriptionValue = type === 'text' ? (note.content || '') : type === 'todo' ? (note.todo_description || '') : (note.counter_description || '');
+  const contentSection = type === 'todo' ? renderTodoPanelContent(note) : type === 'counter' ? renderCounterPanelContent(note) : '<p class="note-preview-meta">Für Text-Notizen ist kein zusätzlicher Content erforderlich.</p>';
+  const activitySection = renderActivityPanelContent(note);
+  const documentsSection = renderDocumentsPanelContent(note);
+
   return `
-    <article class="note-card" data-note-id="${escapeAttribute(note.id)}">
-      <label>Beschreibung
-        <textarea rows="6" data-field="content" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.content || '')}</textarea>
+    <section class="panel-section section-description">
+      <textarea data-field="${escapeAttribute(descriptionField)}" data-note-id="${noteId}" placeholder="Beschreibung">${escapeHtml(descriptionValue)}</textarea>
+    </section>
+    <section class="panel-section section-content">
+      ${contentSection}
+    </section>
+    <section class="panel-section section-activity">
+      ${activitySection}
+    </section>
+    <section class="panel-section section-documents">
+      ${documentsSection}
+    </section>
+    <section class="panel-actions">
+      <label class="button-secondary upload-button">Anhängen
+        <input type="file" data-action="upload-attachment" data-note-id="${noteId}" accept="${escapeAttribute(DOCUMENT_ACCEPT)}" />
       </label>
-      <button type="button" class="button-secondary" data-action="save-text" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
-    </article>
+      <button type="button" class="button-secondary" data-action="save-note" data-note-id="${noteId}">Speichern</button>
+      <button type="button" class="button-danger" data-action="delete-note" data-note-id="${noteId}">Löschen</button>
+    </section>
   `;
 }
 
-function renderActivityTab(note) {
-  const rows = buildActivityTimeline(note);
-  return rows.length
-    ? `<ul class="activity-list">${rows.map((row) => `<li><strong>${escapeHtml(row.user)}</strong><span>${escapeHtml(row.when)}</span><p>${escapeHtml(row.action)}</p></li>`).join('')}</ul>`
-    : '<p class="modal-empty">Noch keine Aktivitäten.</p>';
-}
-
-function renderDocumentsTab(note) {
-  return renderAttachmentsSection(note);
-}
-
-function renderAttachmentsSection(note) {
+function renderDocumentsPanelContent(note) {
   const attachments = normalizeAttachments(note.attachments);
-  const noteId = escapeAttribute(note.id);
   return `
-    <section class="attachments-section">
-      <header class="attachments-header">
-        <h4>Dokumente</h4>
-        <label class="button-secondary upload-button">
-          Anhängen
-          <input type="file" data-action="upload-attachment" data-note-id="${noteId}" accept="${escapeAttribute(DOCUMENT_ACCEPT)}" />
-        </label>
-      </header>
-      <div class="attachments-grid">
-        ${attachments.length ? attachments.map((attachment, index) => renderAttachmentCard(note, attachment, index)).join('') : '<p class="note-preview-meta">Keine Dokumente vorhanden.</p>'}
+    <div class="documents-strip">
+      ${attachments.length ? attachments.map((attachment, index) => `
+        <article class="doc-chip">
+          <strong>${escapeHtml(getAttachmentVisual(attachment))} ${escapeHtml(attachment.name || 'Dokument')}</strong>
+          <div class="attachment-actions-row">
+            <a href="${escapeAttribute(getAttachmentUrl(attachment))}" target="_blank" rel="noopener noreferrer">Öffnen</a>
+            <button type="button" class="button-danger attachment-delete" data-action="delete-attachment" data-note-id="${escapeAttribute(note.id)}" data-index="${index}">✕</button>
+          </div>
+        </article>
+      `).join('') : '<p class="note-preview-meta">Keine Dokumente vorhanden.</p>'}
+    </div>
+  `;
+}
+
+function renderActivityPanelContent(note) {
+  const rows = buildActivityTimeline(note).slice(0, 10);
+  return rows.length
+    ? `<ul class="activity-list compact activity-scroll">${rows.map((row) => `<li><strong>${escapeHtml(row.user)}</strong><span>${escapeHtml(row.when)}</span><p>${escapeHtml(row.action)}</p></li>`).join('')}</ul>`
+    : '<p class="note-preview-meta">Noch keine Aktivitäten.</p>';
+}
+
+function renderTodoPanelContent(note) {
+  const items = normalizeTodoItems(note.todo_items);
+  const todoRows = items.length
+    ? `<ul class="todo-list compact">${items.slice(0, 8).map((item, index) => `
+      <li class="todo-item ${item.done ? 'done' : ''}">
+        <input type="checkbox" data-action="toggle-todo" data-note-id="${escapeAttribute(note.id)}" data-index="${index}" ${item.done ? 'checked' : ''} />
+        <span>${escapeHtml(item.text || 'Untitled')}</span>
+      </li>
+    `).join('')}</ul>`
+    : '<p class="note-preview-meta">Noch keine To-dos</p>';
+  return `
+    <div class="todo-scroll">
+      ${todoRows}
+      <div class="todo-multi-add" data-note-id="${escapeAttribute(note.id)}" data-block="todo-multi">
+        <div class="todo-input-row">
+          <input type="text" maxlength="180" data-field="todo-batch-input" data-note-id="${escapeAttribute(note.id)}" placeholder="To-do eingeben" />
+          <button type="button" class="todo-add-line" data-action="add-todo-line" data-note-id="${escapeAttribute(note.id)}">+</button>
+        </div>
       </div>
-    </section>
+    </div>
+  `;
+}
+
+function renderCounterPanelContent(note) {
+  const target = Math.max(1, Number(note.counter_start_value ?? 1));
+  const value = Math.max(0, Number(note.counter_value ?? 0));
+  const percent = Math.min(100, Math.round((value / target) * 100));
+  return `
+    <div class="counter-compact">
+      <div>
+        <p class="counter-now">${escapeHtml(String(value))}</p>
+        <p class="counter-target">Zielwert: ${escapeHtml(String(target))}</p>
+      </div>
+      <button type="button" class="button-primary counter-plus-compact" data-action="confirm-counter-plus" data-note-id="${escapeAttribute(note.id)}">+1</button>
+      <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}">
+        <div class="preview-progress-fill" style="width:${percent}%;"></div>
+      </div>
+    </div>
   `;
 }
 
@@ -533,8 +551,8 @@ async function handlePanelClick(event) {
     return;
   }
 
-  if (button.dataset.action === 'add-todo') {
-    await addTodoItem(noteId);
+  if (button.dataset.action === 'add-todo-line') {
+    addTodoInputLine(noteId);
     return;
   }
 
@@ -553,6 +571,16 @@ async function handlePanelClick(event) {
     if (Number.isInteger(index) && index >= 0) {
       await deleteAttachment(noteId, index);
     }
+  }
+
+  if (button.dataset.action === 'save-note') {
+    await saveUnifiedNote(noteId);
+    return;
+  }
+
+  if (button.dataset.action === 'delete-note') {
+    await deleteNote(noteId);
+    closePanel();
   }
 }
 
@@ -615,10 +643,23 @@ async function handleBoardKeydown(event) {
   await addTodoItem(String(input.dataset.noteId || '').trim(), input);
 }
 
-function switchPanelTab(tab) {
-  if (!tab) return;
-  state.panelTab = tab;
-  renderPanel();
+function addTodoInputLine(noteId) {
+  const container = elements.panelContent?.querySelector(`[data-block="todo-multi"][data-note-id="${noteId}"]`);
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'todo-input-row';
+  row.innerHTML = `<input type="text" maxlength="180" data-field="todo-batch-input" data-note-id="${escapeAttribute(noteId)}" placeholder="To-do eingeben" />`;
+  container.appendChild(row);
+  row.querySelector('input')?.focus();
+}
+
+function handlePanelKeydown(event) {
+  if (event.key !== 'Enter') return;
+  const targetInput = event.target.closest('[data-field="todo-batch-input"]');
+  if (!targetInput) return;
+  event.preventDefault();
+  const noteId = String(targetInput.dataset.noteId || '').trim();
+  addTodoInputLine(noteId);
 }
 
 function updateCreateTypeFields() {
@@ -691,6 +732,42 @@ async function addTodoItem(noteId, inputElement = null) {
   const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: items }).eq('id', noteId);
   if (error) {
     showAlert(`To-do konnte nicht hinzugefügt werden: ${error.message}`, true);
+    return;
+  }
+  await loadData();
+}
+
+async function saveUnifiedNote(noteId) {
+  const note = state.notes.find((entry) => String(entry.id) === noteId);
+  if (!note) return;
+  const type = getNoteType(note);
+  if (type === 'text') {
+    await saveTextNote(noteId);
+    return;
+  }
+  if (type === 'counter') {
+    await saveCounterMeta(noteId);
+    return;
+  }
+  if (type === 'todo') {
+    await saveTodoMeta(noteId);
+    await saveTodoBatch(noteId);
+  }
+}
+
+async function saveTodoBatch(noteId) {
+  const note = state.notes.find((entry) => String(entry.id) === noteId);
+  if (!note) return;
+  const batchInputs = Array.from(elements.panelContent?.querySelectorAll(`[data-field="todo-batch-input"][data-note-id="${noteId}"]`) || []);
+  const additions = batchInputs.map((input) => String(input.value || '').trim()).filter(Boolean);
+  if (!additions.length) return;
+  const items = normalizeTodoItems(note.todo_items);
+  additions.forEach((text) => {
+    items.push({ text, done: false, done_by_uid: null, done_by_name: null, done_at: null });
+  });
+  const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: items }).eq('id', noteId);
+  if (error) {
+    showAlert(`To-dos konnten nicht gespeichert werden: ${error.message}`, true);
     return;
   }
   await loadData();

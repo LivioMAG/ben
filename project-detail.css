@@ -165,10 +165,11 @@ body {
   border: 1px solid rgba(148, 163, 184, 0.18);
   border-radius: 16px;
   padding: 16px;
-  min-height: 160px;
+  min-height: 140px;
+  max-height: 220px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   cursor: grab;
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
   transition: transform 0.18s ease, box-shadow 0.18s ease;
@@ -269,31 +270,21 @@ body {
 
 .slide-card {
   margin-left: auto;
-  width: min(560px, calc(100vw - 24px));
+  width: clamp(420px, 35vw, 520px);
+  max-width: calc(100vw - 24px);
   height: 100vh;
   background: #fff;
   border-left: 1px solid rgba(148, 163, 184, 0.2);
   box-shadow: -22px 0 42px rgba(15, 23, 42, 0.18);
-  padding: 20px;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   position: relative;
 }
 
-.slide-header { display: flex; justify-content: space-between; align-items: center; }
-.slide-header h2 { margin: 0; font-size: 20px; }
-.slide-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.slide-tab {
-  border: 0;
-  border-radius: 10px;
-  padding: 8px 10px;
-  background: #edf2f7;
-  cursor: pointer;
-  font-weight: 600;
-}
-.slide-tab.active { background: #111827; color: #fff; }
-.panel-content { flex: 1; overflow: auto; display: grid; gap: 12px; padding-bottom: 8px; }
+.slide-header { display: flex; justify-content: flex-end; align-items: center; }
+.panel-content { flex: 1; overflow: hidden; display: grid; gap: 10px; padding-bottom: 4px; }
 
 .modal-card {
   position: relative;
@@ -531,6 +522,167 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+
+.panel-section {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fff;
+  display: grid;
+  gap: 8px;
+}
+
+.panel-section h3 {
+  margin: 0;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(15, 23, 42, 0.58);
+}
+
+.section-description { height: 96px; }
+.section-content { height: 140px; }
+.section-activity { height: 120px; }
+.section-documents { height: 100px; }
+
+.section-description textarea,
+.section-content textarea {
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  resize: none;
+}
+
+.todo-scroll,
+.activity-scroll {
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 2px;
+}
+
+.todo-multi-add {
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+}
+
+.todo-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.todo-input-row input {
+  flex: 1;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 8px 9px;
+  font: inherit;
+}
+
+.todo-add-line {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #f8fafc;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.counter-compact {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 10px;
+  align-items: center;
+}
+
+.counter-now {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.counter-target {
+  margin: 0;
+  font-size: 12px;
+  color: rgba(15, 23, 42, 0.65);
+}
+
+.counter-compact .preview-progress {
+  grid-column: 1 / -1;
+}
+
+.counter-plus-compact {
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+}
+
+.activity-list.compact {
+  gap: 6px;
+}
+
+.activity-list.compact li {
+  padding: 8px;
+  gap: 2px;
+}
+
+.activity-list.compact strong { font-size: 12px; }
+.activity-list.compact p { font-size: 12px; }
+.activity-list.compact span { font-size: 11px; }
+
+.documents-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(130px, 1fr);
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.doc-chip {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px;
+  min-height: 74px;
+  display: grid;
+  align-content: space-between;
+  gap: 6px;
+  background: #f8fafc;
+}
+
+.doc-chip strong {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-chip a {
+  font-size: 12px;
+  color: #0f172a;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.panel-actions .button-secondary,
+.panel-actions .button-danger {
+  height: 38px;
+  padding: 0 12px;
 }
 
 @media (max-width: 1280px) {
