@@ -968,12 +968,11 @@ function setupNotesDashboard() {
       alert(`${message} ${error?.message ? `(${error.message})` : ''}`.trim());
     },
   });
-  state.notesDashboard.clear();
 }
 
 async function refreshNotesDashboardData() {
   if (!state.notesDashboard) return;
-  if (state.isDemoMode || !state.user) {
+  if (state.isDemoMode || !state.user || !state.hasAdminAccess) {
     state.notesDashboard.clear();
     return;
   }
@@ -1513,15 +1512,9 @@ function resetAppState() {
   state.tabHiddenAt = 0;
   state.lastResumeRefreshAt = 0;
   state.pendingDataReload = false;
-  state.dispoGapProjectId = '';
   clearLoadRecoveryTimer();
   closeReportEditModal();
   closeAdjustedMinutesModal();
-  closeDispoGapSearchModal();
-  if (elements.dispoGapResults) {
-    elements.dispoGapResults.innerHTML = '';
-    elements.dispoGapResults.classList.add('hidden');
-  }
   elements.dataTimestamp.textContent = 'Noch keine Daten geladen';
 }
 
