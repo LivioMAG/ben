@@ -11,11 +11,13 @@ const KANBAN_COLUMNS = [
 
 const state = {
   supabase: null,
+  user: null,
   projectId: '',
   project: null,
   notes: [],
   draggedNoteId: null,
   activeColumnKey: null,
+  activeNoteId: null,
 };
 
 const elements = {};
@@ -61,6 +63,7 @@ function cacheElements() {
   elements.newNoteType = document.getElementById('newNoteType');
   elements.newNoteTitle = document.getElementById('newNoteTitle');
   elements.newNoteText = document.getElementById('newNoteText');
+  elements.newTodoDescription = document.getElementById('newTodoDescription');
   elements.newTodoItem = document.getElementById('newTodoItem');
   elements.newCounterDescription = document.getElementById('newCounterDescription');
   elements.newCounterStart = document.getElementById('newCounterStart');
@@ -92,6 +95,8 @@ function bindEvents() {
 async function initializeSupabase() {
   const config = await fetch(CONFIG_PATH, { cache: 'no-store' }).then((res) => res.json());
   state.supabase = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+  const { data: sessionData } = await state.supabase.auth.getSession();
+  state.user = sessionData?.session?.user || null;
 }
 
 async function loadData() {
@@ -145,11 +150,10 @@ function renderPreviewCard(note) {
   const previewText = getPreviewText(note, noteType);
   const progress = getPreviewProgress(note, noteType);
   const titleMarkup = title ? `<h3 class="note-preview-title">${escapeHtml(title)}</h3>` : '';
-  const progressMarkup = progress ? `
+  const progressMarkup = progress?.percent > 0 || noteType === 'todo' || noteType === 'counter' ? `
     <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${escapeAttribute(progress.percent)}">
       <div class="preview-progress-fill" style="width:${escapeAttribute(progress.percent)}%;"></div>
     </div>
-    <p class="note-preview-meta">${escapeHtml(progress.label)}</p>
   ` : '';
   return `
     <article class="note-preview" draggable="true" data-note-id="${escapeAttribute(note.id)}" data-column="${escapeAttribute(note.status)}">
@@ -162,30 +166,30 @@ function renderPreviewCard(note) {
 
 function getPreviewText(note, noteType) {
   if (noteType === 'todo') {
-    return String(note.title || '').trim() || 'To-do-Notiz';
+    return truncateText(String(note.todo_description || '').trim(), 90) || 'To-do-Notiz';
   }
   if (noteType === 'counter') {
     const description = String(note.counter_description || '').trim();
-    if (description) return truncateText(description, 100);
-    return String(note.title || '').trim() || 'Counter-Notiz';
+    if (description) return truncateText(description, 90);
+    return 'Counter-Notiz';
   }
-  return truncateText(String(note.content || '').trim(), 100) || 'Kein Inhalt';
+  return truncateText(String(note.content || '').trim(), 90) || 'Kein Inhalt';
 }
 
 function getPreviewProgress(note, noteType) {
   if (noteType === 'todo') {
     const items = normalizeTodoItems(note.todo_items);
-    if (!items.length) return { percent: 0, label: '0/0 erledigt' };
+    if (!items.length) return { percent: 0 };
     const done = items.filter((item) => item.done).length;
     const percent = Math.round((done / items.length) * 100);
-    return { percent, label: `${done}/${items.length} erledigt` };
+    return { percent };
   }
   if (noteType === 'counter') {
     const start = Math.max(0, Number(note.counter_start_value ?? 0));
     const current = Math.max(0, Number(note.counter_value ?? 0));
     const completed = start > 0 ? Math.min(start, Math.max(0, start - current)) : 0;
     const percent = start > 0 ? Math.round((completed / start) * 100) : 0;
-    return { percent, label: `${current} offen` };
+    return { percent };
   }
   return null;
 }
@@ -209,10 +213,13 @@ function handleBoardClick(event) {
 function openModal(columnKey, focusNoteId = '') {
   const columnMeta = getColumnMeta(columnKey);
   state.activeColumnKey = columnKey;
+  state.activeNoteId = focusNoteId || null;
   elements.modalTitle.textContent = `${columnMeta.label} – Notizen`;
   elements.createNoteForm.classList.add('hidden');
   elements.createNoteForm.reset();
   updateCreateTypeFields();
+  elements.addNoteButton?.classList.toggle('hidden', Boolean(state.activeNoteId));
+  elements.modal.classList.toggle('single-note-mode', Boolean(state.activeNoteId));
   elements.modal.classList.remove('hidden');
   renderModalNotes();
   if (focusNoteId) {
@@ -225,12 +232,14 @@ function openModal(columnKey, focusNoteId = '') {
 
 function closeModal() {
   state.activeColumnKey = null;
+  state.activeNoteId = null;
+  elements.modal.classList.remove('single-note-mode');
   elements.modal.classList.add('hidden');
 }
 
 function renderModalNotes() {
   if (!state.activeColumnKey || !elements.modalNotesList) return;
-  const notes = getNotesByColumn(state.activeColumnKey);
+  const notes = getNotesByColumn(state.activeColumnKey).filter((note) => !state.activeNoteId || String(note.id) === String(state.activeNoteId));
 
   if (!notes.length) {
     elements.modalNotesList.innerHTML = '<p class="modal-empty">Noch keine Notizen in dieser Kategorie.</p>';
@@ -274,18 +283,23 @@ function renderTodoCard(note) {
       <header class="note-card-header">
         <span class="type-badge">To-do</span>
         <div class="note-card-actions">
-          <button type="button" class="button-secondary" data-action="save-title" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
+          <button type="button" class="button-secondary" data-action="save-todo-meta" data-note-id="${escapeAttribute(note.id)}">Speichern</button>
           <button type="button" class="button-danger" data-action="delete" data-note-id="${escapeAttribute(note.id)}">Löschen</button>
         </div>
       </header>
-      <label>Titel (optional)
-        <input type="text" data-field="title" data-note-id="${escapeAttribute(note.id)}" value="${escapeAttribute(note.title || '')}" />
+      <label>Beschreibung
+        <textarea rows="2" data-field="todo-description" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.todo_description || '')}</textarea>
       </label>
       <ul class="todo-list">
         ${items.map((item, index) => `
           <li class="todo-item ${item.done ? 'done' : ''}">
             <input type="checkbox" data-action="toggle-todo" data-note-id="${escapeAttribute(note.id)}" data-index="${index}" ${item.done ? 'checked' : ''} />
-            <span>${escapeHtml(item.text || 'Untitled')}</span>
+            <div>
+              <span>${escapeHtml(item.text || 'Untitled')}</span>
+              ${item.done && (item.done_by_uid || item.done_by_name)
+                ? `<div class="todo-item-meta">Erledigt von ${escapeHtml(item.done_by_name || 'Unbekannt')} (${escapeHtml(item.done_by_uid || 'ohne UID')})</div>`
+                : ''}
+            </div>
           </li>
         `).join('')}
       </ul>
@@ -309,22 +323,17 @@ function renderCounterCard(note) {
           <button type="button" class="button-danger" data-action="delete" data-note-id="${escapeAttribute(note.id)}">Löschen</button>
         </div>
       </header>
-      <label>Titel (optional)
-        <input type="text" data-field="title" data-note-id="${escapeAttribute(note.id)}" value="${escapeAttribute(note.title || '')}" />
-      </label>
-      <label>Beschreibung (optional)
+      <label>Beschreibung
         <textarea rows="2" data-field="counter-description" data-note-id="${escapeAttribute(note.id)}">${escapeHtml(note.counter_description || '')}</textarea>
       </label>
       <div class="counter-value">${escapeHtml(String(value))}</div>
       <button type="button" class="button-secondary" data-action="open-counter-comment" data-note-id="${escapeAttribute(note.id)}">-1</button>
       <div class="counter-comment-box hidden" data-counter-box="${escapeAttribute(note.id)}">
-        <label>Kommentar (Pflicht)
-          <input type="text" maxlength="200" data-field="counter-comment" data-note-id="${escapeAttribute(note.id)}" placeholder="Grund für Reduktion" />
-        </label>
+        <p class="note-preview-meta">Es wird nur der Zeitstempel gesetzt.</p>
         <button type="button" class="button-primary" data-action="confirm-counter-minus" data-note-id="${escapeAttribute(note.id)}">Bestätigen</button>
       </div>
       <ul class="counter-log">
-        ${log.map((entry) => `<li>${escapeHtml(entry.timestamp)} – ${escapeHtml(entry.comment)}</li>`).join('') || '<li>Keine Einträge</li>'}
+        ${log.map((entry) => `<li>${escapeHtml(entry.timestamp)} · ${escapeHtml(entry.actor_name || 'Unbekannt')} (${escapeHtml(entry.actor_uid || 'ohne UID')})</li>`).join('') || '<li>Keine Einträge</li>'}
       </ul>
     </article>
   `;
@@ -343,6 +352,7 @@ async function handleCreateNote(event) {
     note_type: noteType,
     title,
     content: '',
+    todo_description: '',
     todo_items: [],
     counter_description: '',
     counter_start_value: 0,
@@ -360,13 +370,16 @@ async function handleCreateNote(event) {
   }
 
   if (noteType === 'todo') {
+    basePayload.title = '';
+    basePayload.todo_description = String(elements.newTodoDescription.value || '').trim();
     const firstTodo = String(elements.newTodoItem.value || '').trim();
     if (firstTodo) {
-      basePayload.todo_items = [{ text: firstTodo, done: false }];
+      basePayload.todo_items = [{ text: firstTodo, done: false, done_by_uid: null, done_by_name: null, done_at: null }];
     }
   }
 
   if (noteType === 'counter') {
+    basePayload.title = '';
     const startValue = Number(elements.newCounterStart.value || 0);
     basePayload.counter_description = String(elements.newCounterDescription.value || '').trim();
     basePayload.counter_start_value = Number.isFinite(startValue) ? Math.round(startValue) : 0;
@@ -404,8 +417,8 @@ async function handleModalClick(event) {
     return;
   }
 
-  if (button.dataset.action === 'save-title') {
-    await saveTitleOnly(noteId);
+  if (button.dataset.action === 'save-todo-meta') {
+    await saveTodoMeta(noteId);
     return;
   }
 
@@ -441,7 +454,11 @@ async function handleModalChange(event) {
     if (!note) return;
     const items = normalizeTodoItems(note.todo_items);
     if (!items[index]) return;
-    items[index].done = Boolean(event.target.checked);
+    const isChecked = Boolean(event.target.checked);
+    items[index].done = isChecked;
+    items[index].done_by_uid = isChecked ? getCurrentUserUid() : null;
+    items[index].done_by_name = isChecked ? getCurrentUserName() : null;
+    items[index].done_at = isChecked ? new Date().toISOString() : null;
     const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: items }).eq('id', noteId);
     if (error) {
       showAlert(`To-do konnte nicht aktualisiert werden: ${error.message}`, true);
@@ -465,7 +482,13 @@ function openCreateNoteForm() {
   elements.createNoteForm.reset();
   if (elements.newNoteType) elements.newNoteType.value = 'text';
   updateCreateTypeFields();
-  elements.newNoteTitle?.focus();
+  if (String(elements.newNoteType?.value || '') === 'text') {
+    elements.newNoteTitle?.focus();
+  } else if (String(elements.newNoteType?.value || '') === 'todo') {
+    elements.newTodoDescription?.focus();
+  } else {
+    elements.newCounterDescription?.focus();
+  }
 }
 
 async function saveTextNote(noteId) {
@@ -488,15 +511,15 @@ async function saveTextNote(noteId) {
   await loadData();
 }
 
-async function saveTitleOnly(noteId) {
-  const titleInput = elements.modalNotesList.querySelector(`[data-field="title"][data-note-id="${noteId}"]`);
-  const title = String(titleInput?.value || '').trim();
-  const { error } = await state.supabase.from(KANBAN_TABLE).update({ title }).eq('id', noteId);
+async function saveTodoMeta(noteId) {
+  const descriptionInput = elements.modalNotesList.querySelector(`[data-field="todo-description"][data-note-id="${noteId}"]`);
+  const todo_description = String(descriptionInput?.value || '').trim();
+  const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_description, title: '' }).eq('id', noteId);
   if (error) {
-    showAlert(`Titel konnte nicht gespeichert werden: ${error.message}`, true);
+    showAlert(`Beschreibung konnte nicht gespeichert werden: ${error.message}`, true);
     return;
   }
-  showAlert('Titel gespeichert.');
+  showAlert('Beschreibung gespeichert.');
   await loadData();
 }
 
@@ -522,10 +545,9 @@ async function addTodoItem(noteId) {
 }
 
 async function saveCounterMeta(noteId) {
-  const titleInput = elements.modalNotesList.querySelector(`[data-field="title"][data-note-id="${noteId}"]`);
   const descriptionInput = elements.modalNotesList.querySelector(`[data-field="counter-description"][data-note-id="${noteId}"]`);
   const payload = {
-    title: String(titleInput?.value || '').trim(),
+    title: '',
     counter_description: String(descriptionInput?.value || '').trim(),
   };
   const { error } = await state.supabase.from(KANBAN_TABLE).update(payload).eq('id', noteId);
@@ -538,13 +560,6 @@ async function saveCounterMeta(noteId) {
 }
 
 async function decrementCounter(noteId) {
-  const commentInput = elements.modalNotesList.querySelector(`[data-field="counter-comment"][data-note-id="${noteId}"]`);
-  const comment = String(commentInput?.value || '').trim();
-  if (!comment) {
-    showAlert('Kommentar ist erforderlich.', true);
-    return;
-  }
-
   const note = state.notes.find((entry) => String(entry.id) === noteId);
   if (!note) return;
 
@@ -552,7 +567,8 @@ async function decrementCounter(noteId) {
   const nextLog = normalizeCounterLog(note.counter_log);
   nextLog.unshift({
     timestamp: new Date().toLocaleString('de-CH'),
-    comment,
+    actor_uid: getCurrentUserUid(),
+    actor_name: getCurrentUserName(),
   });
 
   const { error } = await state.supabase.from(KANBAN_TABLE).update({
@@ -620,15 +636,38 @@ function getColumnMeta(columnKey) {
 function normalizeTodoItems(value) {
   if (!Array.isArray(value)) return [];
   return value
-    .map((item) => ({ text: String(item?.text || '').trim(), done: Boolean(item?.done) }))
+    .map((item) => ({
+      text: String(item?.text || '').trim(),
+      done: Boolean(item?.done),
+      done_by_uid: String(item?.done_by_uid || '').trim(),
+      done_by_name: String(item?.done_by_name || '').trim(),
+      done_at: String(item?.done_at || '').trim(),
+    }))
     .filter((item) => item.text);
 }
 
 function normalizeCounterLog(value) {
   if (!Array.isArray(value)) return [];
   return value
-    .map((entry) => ({ timestamp: String(entry?.timestamp || '').trim(), comment: String(entry?.comment || '').trim() }))
-    .filter((entry) => entry.timestamp && entry.comment);
+    .map((entry) => ({
+      timestamp: String(entry?.timestamp || '').trim(),
+      actor_uid: String(entry?.actor_uid || '').trim(),
+      actor_name: String(entry?.actor_name || '').trim(),
+    }))
+    .filter((entry) => entry.timestamp);
+}
+
+function getCurrentUserUid() {
+  return String(state.user?.id || '').trim() || 'unbekannt';
+}
+
+function getCurrentUserName() {
+  const fullName = String(state.user?.user_metadata?.full_name || '').trim();
+  if (fullName) return fullName;
+  const name = String(state.user?.user_metadata?.name || '').trim();
+  if (name) return name;
+  const emailName = String(state.user?.email || '').trim().split('@')[0];
+  return emailName || 'Unbekannt';
 }
 
 function formatCurrency(value) {
