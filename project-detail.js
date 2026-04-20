@@ -21,6 +21,7 @@ const state = {
   pendingCreateColumn: null,
   activeAttachmentNoteId: null,
   activeCounterHistoryNoteId: null,
+  activeTodoHistoryNoteId: null,
   pendingFocus: null,
 };
 
@@ -72,6 +73,10 @@ function cacheElements() {
   elements.counterHistoryModalBackdrop = document.getElementById('counterHistoryModalBackdrop');
   elements.closeCounterHistoryModalButton = document.getElementById('closeCounterHistoryModalButton');
   elements.counterHistoryModalContent = document.getElementById('counterHistoryModalContent');
+  elements.todoHistoryModal = document.getElementById('todoHistoryModal');
+  elements.todoHistoryModalBackdrop = document.getElementById('todoHistoryModalBackdrop');
+  elements.closeTodoHistoryModalButton = document.getElementById('closeTodoHistoryModalButton');
+  elements.todoHistoryModalContent = document.getElementById('todoHistoryModalContent');
 }
 
 function bindEvents() {
@@ -103,6 +108,9 @@ function bindEvents() {
   elements.documentsModalBackdrop?.addEventListener('click', closeDocumentsModal);
   elements.closeCounterHistoryModalButton?.addEventListener('click', closeCounterHistoryModal);
   elements.counterHistoryModalBackdrop?.addEventListener('click', closeCounterHistoryModal);
+  elements.closeTodoHistoryModalButton?.addEventListener('click', closeTodoHistoryModal);
+  elements.todoHistoryModalBackdrop?.addEventListener('click', closeTodoHistoryModal);
+  elements.todoHistoryModalContent?.addEventListener('click', handleTodoHistoryModalClick);
 }
 
 async function initializeSupabase() {
@@ -140,6 +148,9 @@ function render() {
   }
   if (!elements.counterHistoryModal?.classList.contains('hidden')) {
     renderCounterHistoryModal();
+  }
+  if (!elements.todoHistoryModal?.classList.contains('hidden')) {
+    renderTodoHistoryModal();
   }
   restorePendingFocus();
 }
@@ -192,6 +203,8 @@ function renderPreviewCard(note, columnKey) {
           <select class="type-switch-inline" data-action="change-note-type" data-note-id="${escapeAttribute(note.id)}" aria-label="Notiztyp">${typeOptions}</select>
         </div>
         <div class="card-actions-inline">
+          ${noteType === 'todo' ? `<button type="button" class="icon-plain" data-action="open-todo-history" data-note-id="${escapeAttribute(note.id)}" aria-label="To-do-History">🕘</button>` : ''}
+          ${noteType === 'counter' ? `<button type="button" class="icon-plain" data-action="open-counter-history" data-note-id="${escapeAttribute(note.id)}" aria-label="Counter-History">🕘</button>` : ''}
           <button type="button" class="icon-plain" data-action="open-attachments" data-note-id="${escapeAttribute(note.id)}" aria-label="Anhänge">📎${attachments.length ? ` <span class="badge-count">${attachments.length}</span>` : ''}</button>
           <button type="button" class="icon-plain" data-action="delete-note" data-note-id="${escapeAttribute(note.id)}" aria-label="Löschen">🗑️</button>
         </div>
@@ -257,8 +270,16 @@ function handleBoardClick(event) {
     openAttachmentModal(noteId);
     return;
   }
+  if (action === 'open-todo-history' && noteId) {
+    openTodoHistoryModal(noteId);
+    return;
+  }
   if (action === 'confirm-counter-plus' && noteId) {
     incrementCounter(noteId);
+    return;
+  }
+  if (action === 'edit-counter-target' && noteId) {
+    editCounterTarget(noteId);
     return;
   }
   if (action === 'open-counter-history' && noteId) {
@@ -268,16 +289,15 @@ function handleBoardClick(event) {
 
 function renderTodoPreview(note) {
   const items = normalizeTodoItems(note.todo_items);
-  const sortedItems = [
-    ...items.filter((item) => !item.done),
-    ...items.filter((item) => item.done),
-  ];
-  const list = items.length
+  const activeItems = items.filter((item) => !item.done);
+  const list = activeItems.length
     ? `
       <ul class="todo-list compact">
-        ${sortedItems.map((item, index) => `
-          <li class="todo-item ${item.done ? 'done' : ''}">
-            <input type="checkbox" data-action="toggle-todo" data-note-id="${escapeAttribute(note.id)}" data-index="${index}" ${item.done ? 'checked' : ''} />
+        ${activeItems.map((item) => {
+          const originalIndex = items.indexOf(item);
+          return `
+          <li class="todo-item">
+            <input type="checkbox" data-action="toggle-todo" data-note-id="${escapeAttribute(note.id)}" data-index="${originalIndex}" />
             <input
               type="text"
               class="todo-inline-text"
@@ -285,12 +305,12 @@ function renderTodoPreview(note) {
               value="${escapeAttribute(item.text || 'Untitled')}"
               data-field="todo-item-inline"
               data-note-id="${escapeAttribute(note.id)}"
-              data-index="${index}"
+              data-index="${originalIndex}"
               aria-label="To-do Text"
             />
           </li>
-          ${item.done_at ? `<li class="todo-item-meta">${escapeHtml(item.done_by_name || 'Unbekannt')} · ${escapeHtml(formatTimestamp(item.done_at))}</li>` : ''}
-        `).join('')}
+        `;
+        }).join('')}
       </ul>
     `
     : '<p class="note-preview-meta">Noch keine To-dos</p>';
@@ -305,26 +325,12 @@ function renderCounterPreview(note) {
   const value = Math.max(0, Number(note.counter_value ?? 0));
   const percent = Math.min(100, Math.round((value / target) * 100));
   return `
-    <div class="counter-main">${escapeHtml(String(value))} / ${escapeHtml(String(target))}</div>
-      <div class="counter-target-inline">
-        <label for="counter-target-${escapeAttribute(note.id)}">Ziel:</label>
-        <input
-          id="counter-target-${escapeAttribute(note.id)}"
-          type="number"
-          min="1"
-          step="1"
-          data-field="counter-target-inline"
-          data-note-id="${escapeAttribute(note.id)}"
-          value="${escapeAttribute(String(target))}"
-          aria-label="Counter Zielwert"
-        />
-      </div>
+    <div class="counter-main">${escapeHtml(String(value))} von <button type="button" class="counter-target-edit-trigger" data-action="edit-counter-target" data-note-id="${escapeAttribute(note.id)}" aria-label="Counter Ziel bearbeiten">${escapeHtml(String(target))}</button></div>
       <div class="preview-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, Math.round((value / target) * 100))}">
         <div class="preview-progress-fill" style="width:${percent}%;"></div>
       </div>
       <div class="counter-actions">
         <button type="button" class="button-primary counter-plus" data-action="confirm-counter-plus" data-note-id="${escapeAttribute(note.id)}">Bestätigen</button>
-        <button type="button" class="button-secondary counter-history-open" data-action="open-counter-history" data-note-id="${escapeAttribute(note.id)}">History</button>
       </div>
   `;
 }
@@ -399,6 +405,49 @@ function openCounterHistoryModal(noteId) {
 function closeCounterHistoryModal() {
   state.activeCounterHistoryNoteId = null;
   elements.counterHistoryModal?.classList.add('hidden');
+}
+
+function openTodoHistoryModal(noteId) {
+  state.activeTodoHistoryNoteId = noteId;
+  elements.todoHistoryModal?.classList.remove('hidden');
+  renderTodoHistoryModal();
+}
+
+function closeTodoHistoryModal() {
+  state.activeTodoHistoryNoteId = null;
+  elements.todoHistoryModal?.classList.add('hidden');
+}
+
+function renderTodoHistoryModal() {
+  if (!elements.todoHistoryModalContent) return;
+  const note = state.notes.find((entry) => String(entry.id) === String(state.activeTodoHistoryNoteId));
+  if (!note) {
+    elements.todoHistoryModalContent.innerHTML = '<p class="modal-empty">To-do nicht gefunden.</p>';
+    return;
+  }
+  const doneItems = normalizeTodoItems(note.todo_items).filter((item) => item.done);
+  elements.todoHistoryModalContent.innerHTML = doneItems.length
+    ? `
+      <ul class="counter-history-list todo-history-list">
+        ${doneItems.map((item, index) => `
+          <li class="todo-history-main">
+            <p>${escapeHtml(item.text || 'Unbenanntes To-do')}</p>
+            <button type="button" class="button-secondary" data-action="restore-todo-item" data-note-id="${escapeAttribute(note.id)}" data-history-index="${index}">Aktivieren</button>
+          </li>
+          <li class="todo-item-meta">${escapeHtml(item.done_by_name || 'Unbekannt')} · ${escapeHtml(formatTimestamp(item.done_at))}</li>
+        `).join('')}
+      </ul>
+    `
+    : '<p class="modal-empty">Noch keine erledigten To-dos.</p>';
+}
+
+async function handleTodoHistoryModalClick(event) {
+  const button = event.target.closest('[data-action="restore-todo-item"]');
+  if (!button) return;
+  const noteId = String(button.dataset.noteId || '').trim();
+  const historyIndex = Number(button.dataset.historyIndex);
+  if (!noteId || Number.isNaN(historyIndex)) return;
+  await restoreTodoItem(noteId, historyIndex);
 }
 
 function renderCounterHistoryModal() {
@@ -624,6 +673,15 @@ async function saveCounterTarget(noteId, value) {
   await loadData();
 }
 
+async function editCounterTarget(noteId) {
+  const note = state.notes.find((entry) => String(entry.id) === String(noteId));
+  if (!note) return;
+  const currentTarget = Math.max(1, Number(note.counter_start_value ?? 1));
+  const raw = window.prompt('Neues Ziel eingeben', String(currentTarget));
+  if (raw === null) return;
+  await saveCounterTarget(noteId, raw);
+}
+
 async function changeNoteType(noteId, nextType) {
   const normalizedType = ['text', 'todo', 'counter'].includes(nextType) ? nextType : 'text';
   const note = state.notes.find((entry) => String(entry.id) === String(noteId));
@@ -681,6 +739,29 @@ async function saveTodoItemText(noteId, index, nextText) {
   const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: items }).eq('id', noteId);
   if (error) {
     showAlert(`To-do konnte nicht aktualisiert werden: ${error.message}`, true);
+    return;
+  }
+  await loadData();
+}
+
+async function restoreTodoItem(noteId, historyIndex) {
+  const note = state.notes.find((entry) => String(entry.id) === noteId);
+  if (!note) return;
+  const items = normalizeTodoItems(note.todo_items);
+  const doneIndexes = items.map((item, idx) => ({ item, idx })).filter((entry) => entry.item.done);
+  const selected = doneIndexes[historyIndex];
+  if (!selected) return;
+  items[selected.idx].done = false;
+  items[selected.idx].done_by_uid = null;
+  items[selected.idx].done_by_name = null;
+  items[selected.idx].done_at = null;
+  const sortedItems = [
+    ...items.filter((item) => !item.done),
+    ...items.filter((item) => item.done),
+  ];
+  const { error } = await state.supabase.from(KANBAN_TABLE).update({ todo_items: sortedItems }).eq('id', noteId);
+  if (error) {
+    showAlert(`To-do konnte nicht aktiviert werden: ${error.message}`, true);
     return;
   }
   await loadData();
