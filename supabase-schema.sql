@@ -530,11 +530,39 @@ create table if not exists public.project_kanban_notes (
   status text not null default 'todo' check (status in ('todo', 'planned', 'in_progress', 'review', 'done')),
   position integer not null default 0,
   content text not null,
+  note_type text not null default 'text' check (note_type in ('text', 'todo', 'counter')),
+  title text,
+  todo_items jsonb not null default '[]'::jsonb,
+  counter_start_value integer not null default 0,
+  counter_value integer not null default 0,
+  counter_description text,
+  counter_log jsonb not null default '[]'::jsonb,
   progress_percent smallint not null default 0 check (progress_percent between 0 and 100),
   checklist_history jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.project_kanban_notes
+add column if not exists note_type text not null default 'text' check (note_type in ('text', 'todo', 'counter'));
+
+alter table public.project_kanban_notes
+add column if not exists title text;
+
+alter table public.project_kanban_notes
+add column if not exists todo_items jsonb not null default '[]'::jsonb;
+
+alter table public.project_kanban_notes
+add column if not exists counter_start_value integer not null default 0;
+
+alter table public.project_kanban_notes
+add column if not exists counter_value integer not null default 0;
+
+alter table public.project_kanban_notes
+add column if not exists counter_description text;
+
+alter table public.project_kanban_notes
+add column if not exists counter_log jsonb not null default '[]'::jsonb;
 
 create unique index if not exists projects_commission_number_idx
 on public.projects (commission_number);

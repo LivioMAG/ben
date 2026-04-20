@@ -40,21 +40,59 @@
 
           <div id="alert" class="alert hidden"></div>
 
-          <form id="noteForm" class="note-form">
-            <label for="noteText">Neue Karte</label>
-            <textarea id="noteText" rows="3" placeholder="Notiztext oder To-Do-Liste …" required></textarea>
-            <div class="note-form-row">
-              <label>
-                Fortschritt (%)
-                <input id="noteProgress" type="number" min="0" max="100" value="0" />
-              </label>
-              <button class="button-primary" type="submit">Karte hinzufügen</button>
-            </div>
-          </form>
-
+          <p class="board-hint">Doppelklick auf eine Kategorie, um die zugehörigen Notizen zu verwalten.</p>
           <section class="kanban-board" id="kanbanBoard" aria-label="Kanban Board"></section>
         </section>
       </main>
+    </div>
+
+    <div id="notesModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="notesModalTitle">
+      <div id="notesModalBackdrop" class="modal-backdrop"></div>
+      <div class="modal-card">
+        <header id="notesModalHeader" class="modal-header">
+          <h2 id="notesModalTitle">Kategorie-Notizen</h2>
+          <div class="modal-actions">
+            <button id="addNoteButton" class="icon-action" type="button" title="Notiz hinzufügen" aria-label="Notiz hinzufügen">＋</button>
+            <button id="closeModalButton" class="icon-action" type="button" title="Schliessen" aria-label="Schliessen">✕</button>
+          </div>
+        </header>
+
+        <form id="createNoteForm" class="create-note-form hidden">
+          <label>
+            Typ
+            <select id="newNoteType" required>
+              <option value="text">Text-Notiz</option>
+              <option value="todo">To-do-Notiz</option>
+              <option value="counter">Counter-Notiz</option>
+            </select>
+          </label>
+          <label>
+            Titel (optional)
+            <input id="newNoteTitle" type="text" maxlength="160" placeholder="Titel" />
+          </label>
+          <label data-type-field="text" data-type="text">
+            Inhalt
+            <textarea id="newNoteText" rows="3" placeholder="Freitext"></textarea>
+          </label>
+          <label data-type-field="todo" data-type="todo" class="hidden">
+            Erstes To-do (optional)
+            <input id="newTodoItem" type="text" maxlength="180" placeholder="To-do hinzufügen" />
+          </label>
+          <label data-type-field="counter" data-type="counter" class="hidden">
+            Beschreibung (optional)
+            <textarea id="newCounterDescription" rows="2" placeholder="Beschreibung"></textarea>
+          </label>
+          <label data-type-field="counter" data-type="counter" class="hidden">
+            Startwert
+            <input id="newCounterStart" type="number" step="1" value="0" />
+          </label>
+          <div class="form-actions">
+            <button class="button-primary" type="submit">Notiz erstellen</button>
+          </div>
+        </form>
+
+        <div id="modalNotesList" class="modal-notes-list"></div>
+      </div>
     </div>
   </body>
 </html>
