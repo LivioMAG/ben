@@ -941,16 +941,16 @@ tbody tr:hover {
 .notes-dashboard-panel {
   padding: 12px;
   position: relative;
-  min-height: 0;
-  height: 100%;
+  min-height: clamp(520px, 72vh, 980px);
+  height: auto;
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: visible;
 }
 
 .notes-dashboard-canvas {
   position: relative;
-  min-height: 0;
+  min-height: clamp(420px, 62vh, 900px);
   height: 100%;
   border: 1px solid rgba(17, 17, 17, 0.08);
   border-radius: 18px;
@@ -1104,6 +1104,13 @@ tbody tr:hover {
 
 #appView.dashboard-minimal #notesDashboardPanel {
   margin: 0;
+  min-height: 0;
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+#appView.dashboard-minimal #notesDashboardPanel .notes-dashboard-canvas {
+  min-height: 0;
 }
 
 .notes-detail-modal-card {
