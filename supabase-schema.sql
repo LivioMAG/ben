@@ -1,11 +1,5 @@
 create extension if not exists pgcrypto;
 
--- IMPORTANT:
--- Run this file as plain SQL in the Supabase SQL Editor.
--- If you ever see `syntax error at or near "@@"`, the pasted text likely
--- contains Git diff markers (e.g. `@@ ... @@`, lines starting with `+` or `-`).
--- Remove those markers and execute only valid SQL statements.
-
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -16,7 +10,7 @@ begin
 end;
 $$;
 
-create table if not exists public.app_profiles (
+create table public.app_profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   email text not null unique,
   full_name text not null,
@@ -37,7 +31,66 @@ create table if not exists public.app_profiles (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
-create table if not exists public.weekly_reports (
+create table public.crm_contacts (
+  id uuid primary key default gen_random_uuid(),
+  category text not null check (category in ('kunde', 'lieferant', 'elektroplaner', 'subunternehmer', 'unternehmer')),
+  company_name text,
+  first_name text not null,
+  last_name text not null,
+  street text,
+  city text,
+  postal_code text,
+  phone text,
+  email text,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table public.properties (
+  id uuid primary key default gen_random_uuid(),
+  contact_id uuid not null references public.crm_contacts(id) on delete cascade,
+  name text not null,
+  strasse text not null,
+  postleitzahl text not null,
+  ort text not null,
+  budget numeric(12,2) not null check (budget > 0),
+  notizen jsonb not null default '[]'::jsonb,
+  dokumente jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table public.projects (
+  id uuid primary key default gen_random_uuid(),
+  commission_number text not null unique,
+  name text not null,
+  allow_expenses boolean not null default true,
+  budget numeric(12,2) not null default 0,
+  property_id uuid references public.properties(id) on delete set null,
+  project_lead_profile_id uuid references public.app_profiles(id) on delete set null,
+  construction_lead_profile_id uuid references public.app_profiles(id) on delete set null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table public.platform_holidays (
+  id uuid primary key default gen_random_uuid(),
+  holiday_date date not null unique,
+  label text not null,
+  is_paid boolean not null default true,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table public.school_vacations (
+  id uuid primary key default gen_random_uuid(),
+  start_date date not null,
+  end_date date not null,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  constraint school_vacations_range_check check (end_date >= start_date)
+);
+
+create table public.weekly_reports (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.app_profiles(id) on delete cascade,
   work_date date not null,
@@ -62,7 +115,7 @@ create table if not exists public.weekly_reports (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
-create table if not exists public.holiday_requests (
+create table public.holiday_requests (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.app_profiles(id) on delete cascade,
   start_date date not null,
@@ -77,7 +130,7 @@ create table if not exists public.holiday_requests (
   constraint holiday_requests_range_check check (end_date >= start_date)
 );
 
-create table if not exists public.request_history (
+create table public.request_history (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default timezone('utc', now()),
   profile_id uuid not null references public.app_profiles(id) on delete cascade,
@@ -85,19 +138,7 @@ create table if not exists public.request_history (
   context text not null
 );
 
-create table if not exists public.projects (
-  id uuid primary key default gen_random_uuid(),
-  commission_number text not null,
-  name text not null,
-  allow_expenses boolean not null default true,
-  budget numeric(12,2) not null default 0,
-  project_lead_profile_id uuid references public.app_profiles(id) on delete set null,
-  construction_lead_profile_id uuid references public.app_profiles(id) on delete set null,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.daily_assignments (
+create table public.daily_assignments (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.app_profiles(id) on delete cascade,
   assignment_date date not null,
@@ -109,101 +150,95 @@ create table if not exists public.daily_assignments (
   constraint daily_assignments_unique_profile_day unique (profile_id, assignment_date)
 );
 
-alter table public.daily_assignments
-drop column if exists assignment_type;
-
-create table if not exists public.platform_holidays (
+create table public.material_entries (
   id uuid primary key default gen_random_uuid(),
-  holiday_date date not null unique,
-  label text not null,
-  is_paid boolean not null default true,
+  kommissionsnummer text not null,
+  betrag numeric(12,2) not null check (betrag > 0),
+  beleg_url text not null,
+  beleg_name text,
+  beschreibung text,
   created_at timestamptz not null default timezone('utc', now())
 );
 
-create table if not exists public.school_vacations (
+create table public.notes (
   id uuid primary key default gen_random_uuid(),
-  start_date date not null,
-  end_date date not null,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now()),
-  constraint school_vacations_range_check check (end_date >= start_date)
+  target_uid uuid not null,
+  note_type text not null default 'crm',
+  note_text text not null,
+  sender_uid uuid not null references public.app_profiles(id) on delete restrict,
+  recipient_uid uuid references public.app_profiles(id) on delete set null,
+  note_category text not null default 'information',
+  requires_response boolean not null default false,
+  visible_from_date date,
+  note_ranking smallint not null default 2 check (note_ranking between 1 and 3),
+  attachments jsonb not null default '[]'::jsonb,
+  note_flow jsonb not null default '[]'::jsonb,
+  note_pos_x integer not null default 24,
+  note_pos_y integer not null default 24,
+  created_at timestamptz not null default timezone('utc', now())
 );
 
-alter table public.app_profiles
-add column if not exists is_admin boolean not null default false;
+create table public.project_kanban_notes (
+  id uuid primary key default gen_random_uuid(),
+  project_id uuid not null references public.projects(id) on delete cascade,
+  status text not null default 'todo' check (status in ('todo', 'planned', 'in_progress', 'review', 'done')),
+  position integer not null default 0,
+  content text not null,
+  note_type text not null default 'text' check (note_type in ('text', 'todo', 'counter')),
+  title text,
+  todo_description text,
+  todo_items jsonb not null default '[]'::jsonb,
+  counter_start_value integer not null default 0,
+  counter_value integer not null default 0,
+  counter_description text,
+  counter_log jsonb not null default '[]'::jsonb,
+  attachments jsonb not null default '[]'::jsonb,
+  progress_percent smallint not null default 0 check (progress_percent between 0 and 100),
+  checklist_history jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
 
-alter table public.app_profiles
-add column if not exists is_active boolean not null default true;
+create table public.dashboard_notes (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.app_profiles(id) on delete cascade,
+  content text not null default '',
+  note_color text not null default 'yellow',
+  pos_x integer not null default 0,
+  pos_y integer not null default 0,
+  width integer not null default 320,
+  height integer not null default 220,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  deleted_at timestamptz
+);
 
-alter table public.app_profiles
-add column if not exists vacation_allowance_hours numeric(10,2) not null default 0;
-
-alter table public.app_profiles
-add column if not exists booked_vacation_hours numeric(10,2) not null default 0;
-
-alter table public.app_profiles
-add column if not exists carryover_overtime_hours numeric(10,2) not null default 0;
-
-alter table public.app_profiles
-add column if not exists reported_hours numeric(10,2) not null default 0;
-
-alter table public.app_profiles
-add column if not exists credited_hours numeric(10,2) not null default 0;
-
-alter table public.app_profiles
-add column if not exists weekly_hours numeric(10,2) not null default 40;
-
-alter table public.app_profiles
-add column if not exists target_revenue numeric(12,2) not null default 0;
-
-alter table public.app_profiles
-add column if not exists school_day_1 smallint;
-
-alter table public.app_profiles
-add column if not exists school_day_2 smallint;
-
-alter table public.app_profiles
-add column if not exists block_schedule jsonb not null default '[]'::jsonb;
-
-alter table public.weekly_reports
-add column if not exists controll text;
-
-alter table public.weekly_reports
-add column if not exists project_name text;
-
-alter table public.weekly_reports
-add column if not exists adjusted_work_minutes integer not null default 0;
-
-alter table public.weekly_reports
-add column if not exists year integer;
-
-alter table public.weekly_reports
-add column if not exists kw integer;
-
-alter table public.weekly_reports
-add column if not exists abz_typ integer not null default 0;
-
-alter table public.holiday_requests
-add column if not exists controll_pl text;
-
-alter table public.holiday_requests
-add column if not exists controll_gl text;
-
-alter table public.platform_holidays
-add column if not exists is_paid boolean not null default true;
+create table public.dashboard_note_attachments (
+  id uuid primary key default gen_random_uuid(),
+  note_id uuid not null references public.dashboard_notes(id) on delete cascade,
+  user_id uuid not null references public.app_profiles(id) on delete cascade,
+  file_name text not null,
+  file_path text not null,
+  file_mime_type text,
+  file_size_bytes bigint not null default 0,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  deleted_at timestamptz
+);
 
 create or replace function public.is_admin_user()
 returns boolean
 language sql
 stable
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
   select exists (
     select 1
     from public.app_profiles
     where id = auth.uid()
       and is_admin = true
+      and is_active = true
   );
 $$;
 
@@ -211,6 +246,7 @@ create or replace function public.build_holiday_request_history_text(request_row
 returns text
 language sql
 stable
+set search_path = public, pg_temp
 as $$
   select trim(
     both ' | ' from concat_ws(
@@ -234,12 +270,16 @@ create or replace function public.approve_holiday_request(
 returns public.holiday_requests
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   updated_request public.holiday_requests%rowtype;
   archive_context text;
 begin
+  if not public.is_admin_user() then
+    raise exception 'Nur Admin darf Absenzgesuche freigeben.';
+  end if;
+
   if p_field_name not in ('controll_pl', 'controll_gl') then
     raise exception 'Ungültiges Freigabefeld: %', p_field_name;
   end if;
@@ -255,12 +295,14 @@ begin
 
   if p_field_name = 'controll_pl' then
     update public.holiday_requests
-    set controll_pl = p_approval_name
+    set controll_pl = p_approval_name,
+        updated_at = timezone('utc', now())
     where id = p_request_id
     returning * into updated_request;
   else
     update public.holiday_requests
-    set controll_gl = p_approval_name
+    set controll_gl = p_approval_name,
+        updated_at = timezone('utc', now())
     where id = p_request_id
     returning * into updated_request;
   end if;
@@ -350,320 +392,6 @@ begin
 end;
 $$;
 
-create table if not exists public.projects (
-  id uuid primary key default gen_random_uuid(),
-  commission_number text not null,
-  name text not null,
-  allow_expenses boolean not null default true,
-  budget numeric(12,2) not null default 0,
-  project_lead_profile_id uuid references public.app_profiles(id) on delete set null,
-  construction_lead_profile_id uuid references public.app_profiles(id) on delete set null,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.crm_contacts (
-  id uuid primary key default gen_random_uuid(),
-  category text not null check (category in ('kunde', 'lieferant', 'elektroplaner', 'subunternehmer', 'unternehmer')),
-  company_name text,
-  first_name text not null,
-  last_name text not null,
-  street text,
-  city text,
-  postal_code text,
-  phone text,
-  email text,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.properties (
-  id uuid primary key default gen_random_uuid(),
-  contact_id uuid not null references public.crm_contacts(id) on delete cascade,
-  name text not null,
-  strasse text not null,
-  postleitzahl text not null,
-  ort text not null,
-  budget numeric(12,2) not null check (budget > 0),
-  notizen jsonb not null default '[]'::jsonb,
-  dokumente jsonb not null default '[]'::jsonb,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
-);
-
-create table if not exists public.material_entries (
-  id uuid primary key default gen_random_uuid(),
-  kommissionsnummer text not null,
-  betrag numeric(12,2) not null check (betrag > 0),
-  beleg_url text not null,
-  beleg_name text,
-  beschreibung text,
-  created_at timestamptz not null default timezone('utc', now())
-);
-
-alter table if exists public.properties
-  drop column if exists adresse;
-
-do $$
-begin
-  if to_regclass('public.notes') is null and to_regclass('public.crm_notes') is not null then
-    alter table public.crm_notes rename to notes;
-  end if;
-end;
-$$;
-
-create table if not exists public.notes (
-  id uuid primary key default gen_random_uuid(),
-  target_uid uuid not null,
-  note_type text not null default 'crm',
-  note_text text not null,
-  sender_uid uuid not null references public.app_profiles(id) on delete restrict,
-  recipient_uid uuid references public.app_profiles(id) on delete set null,
-  note_category text not null default 'information',
-  requires_response boolean not null default false,
-  visible_from_date date,
-  note_ranking smallint not null default 2 check (note_ranking between 1 and 3),
-  attachments jsonb not null default '[]'::jsonb,
-  note_flow jsonb not null default '[]'::jsonb,
-  note_pos_x integer not null default 24,
-  note_pos_y integer not null default 24,
-  created_at timestamptz not null default timezone('utc', now())
-);
-
-alter table public.notes
-add column if not exists note_type text not null default 'crm';
-
-alter table public.notes
-add column if not exists sender_uid uuid references public.app_profiles(id) on delete restrict;
-
-alter table public.notes
-add column if not exists recipient_uid uuid references public.app_profiles(id) on delete set null;
-
-alter table public.notes
-add column if not exists note_category text not null default 'information';
-
-alter table public.notes
-add column if not exists requires_response boolean not null default false;
-
-alter table public.notes
-add column if not exists visible_from_date date;
-
-alter table public.notes
-add column if not exists note_ranking smallint not null default 2;
-
-alter table public.notes
-add column if not exists attachments jsonb not null default '[]'::jsonb;
-
-alter table public.notes
-add column if not exists note_flow jsonb not null default '[]'::jsonb;
-
-
-alter table public.notes
-add column if not exists note_pos_x integer not null default 24;
-
-alter table public.notes
-add column if not exists note_pos_y integer not null default 24;
-
-alter table public.notes
-alter column recipient_uid drop not null;
-
-do $$
-begin
-  if exists (
-    select 1
-    from information_schema.columns
-    where table_schema = 'public'
-      and table_name = 'notes'
-      and column_name = 'sender_uid'
-      and is_nullable = 'YES'
-  ) then
-    update public.notes
-    set sender_uid = (
-      select id
-      from public.app_profiles
-      order by created_at
-      limit 1
-    )
-    where sender_uid is null;
-    alter table public.notes alter column sender_uid set not null;
-  end if;
-end;
-$$;
-
-alter table public.notes
-drop constraint if exists notes_disco_status_check;
-
-drop index if exists public.notes_disco_status_idx;
-
-alter table public.notes
-drop column if exists disco_status;
-
-alter table public.notes
-drop column if exists disco_scheduled_for;
-
-alter table public.notes
-drop column if exists disco_done_at;
-
-do $$
-begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'notes_note_ranking_check'
-      and conrelid = 'public.notes'::regclass
-  ) then
-    alter table public.notes
-      add constraint notes_note_ranking_check check (note_ranking between 1 and 3);
-  end if;
-end;
-$$;
-
-alter table public.projects
-add column if not exists project_lead_profile_id uuid references public.app_profiles(id) on delete set null;
-
-alter table public.projects
-add column if not exists construction_lead_profile_id uuid references public.app_profiles(id) on delete set null;
-
-alter table public.projects
-add column if not exists allow_expenses boolean not null default true;
-
-alter table public.projects
-add column if not exists property_id uuid references public.properties(id) on delete set null;
-
-alter table public.projects
-add column if not exists budget numeric(12,2) not null default 0;
-
-
-create table if not exists public.project_kanban_notes (
-  id uuid primary key default gen_random_uuid(),
-  project_id uuid not null references public.projects(id) on delete cascade,
-  status text not null default 'todo' check (status in ('todo', 'planned', 'in_progress', 'review', 'done')),
-  position integer not null default 0,
-  content text not null,
-  note_type text not null default 'text' check (note_type in ('text', 'todo', 'counter')),
-  title text,
-  todo_description text,
-  todo_items jsonb not null default '[]'::jsonb,
-  counter_start_value integer not null default 0,
-  counter_value integer not null default 0,
-  counter_description text,
-  counter_log jsonb not null default '[]'::jsonb,
-  attachments jsonb not null default '[]'::jsonb,
-  progress_percent smallint not null default 0 check (progress_percent between 0 and 100),
-  checklist_history jsonb not null default '[]'::jsonb,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now())
-);
-
-alter table public.project_kanban_notes
-add column if not exists note_type text not null default 'text' check (note_type in ('text', 'todo', 'counter'));
-
-alter table public.project_kanban_notes
-add column if not exists title text;
-
-alter table public.project_kanban_notes
-add column if not exists todo_description text;
-
-alter table public.project_kanban_notes
-add column if not exists todo_items jsonb not null default '[]'::jsonb;
-
-alter table public.project_kanban_notes
-add column if not exists counter_start_value integer not null default 0;
-
-alter table public.project_kanban_notes
-add column if not exists counter_value integer not null default 0;
-
-alter table public.project_kanban_notes
-add column if not exists counter_description text;
-
-alter table public.project_kanban_notes
-add column if not exists counter_log jsonb not null default '[]'::jsonb;
-
-alter table public.project_kanban_notes
-add column if not exists attachments jsonb not null default '[]'::jsonb;
-
-create unique index if not exists projects_commission_number_idx
-on public.projects (commission_number);
-
-drop table if exists public.project_assignments cascade;
-drop table if exists public.project_disco_entries cascade;
-drop table if exists public.project_disco_layers cascade;
-drop table if exists public.bot_profiles cascade;
-
-drop trigger if exists projects_set_updated_at on public.projects;
-create trigger projects_set_updated_at
-before update on public.projects
-for each row execute function public.set_updated_at();
-
-drop trigger if exists project_kanban_notes_set_updated_at on public.project_kanban_notes;
-create trigger project_kanban_notes_set_updated_at
-before update on public.project_kanban_notes
-for each row execute function public.set_updated_at();
-
-alter table public.projects enable row level security;
-alter table public.crm_contacts enable row level security;
-alter table public.properties enable row level security;
-alter table public.material_entries enable row level security;
-alter table public.notes enable row level security;
-alter table public.school_vacations enable row level security;
-alter table public.project_kanban_notes enable row level security;
-
-drop policy if exists "projects own or admin" on public.projects;
-create policy "projects own or admin"
-on public.projects
-for all
-to authenticated
-using (public.is_admin_user())
-with check (public.is_admin_user());
-
-drop policy if exists "crm_contacts admin access" on public.crm_contacts;
-create policy "crm_contacts admin access"
-on public.crm_contacts
-for all
-to authenticated
-using (public.is_admin_user())
-with check (public.is_admin_user());
-
-drop policy if exists "properties admin access" on public.properties;
-create policy "properties admin access"
-on public.properties
-for all
-to authenticated
-using (public.is_admin_user())
-with check (public.is_admin_user());
-
-drop policy if exists "material_entries admin access" on public.material_entries;
-create policy "material_entries admin access"
-on public.material_entries
-for all
-to authenticated
-using (public.is_admin_user())
-with check (public.is_admin_user());
-
-drop policy if exists "notes admin access" on public.notes;
-create policy "notes admin access"
-on public.notes
-for all
-to authenticated
-using (public.is_admin_user())
-with check (public.is_admin_user());
-
-drop policy if exists "project_kanban_notes admin access" on public.project_kanban_notes;
-create policy "project_kanban_notes admin access"
-on public.project_kanban_notes
-for all
-to authenticated
-using (public.is_admin_user())
-with check (public.is_admin_user());
-
-drop policy if exists "school_vacations admin access" on public.school_vacations;
-create policy "school_vacations admin access"
-on public.school_vacations
-for all
-to authenticated
-using (public.is_admin_user())
-with check (public.is_admin_user());
-
 create or replace function public.reject_holiday_request(
   p_request_id uuid,
   p_context text default 'Abgelehnt'
@@ -671,11 +399,15 @@ create or replace function public.reject_holiday_request(
 returns public.holiday_requests
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   deleted_request public.holiday_requests%rowtype;
 begin
+  if not public.is_admin_user() then
+    raise exception 'Nur Admin darf Absenzgesuche ablehnen.';
+  end if;
+
   delete from public.holiday_requests
   where id = p_request_id
   returning * into deleted_request;
@@ -701,15 +433,17 @@ create or replace function public.purge_user_account(
 returns void
 language plpgsql
 security definer
-set search_path = public, auth, storage
+set search_path = public, auth, storage, pg_temp
 as $$
 begin
   if p_profile_id is null then
     raise exception 'Profil-ID fehlt.';
   end if;
+
   if not public.is_admin_user() then
     raise exception 'Nur Admin darf Benutzer restlos entfernen.';
   end if;
+
   if auth.uid() = p_profile_id then
     raise exception 'Eigenes Profil kann nicht gelöscht werden.';
   end if;
@@ -718,125 +452,307 @@ begin
   where bucket_id = 'weekly-attachments'
     and name like p_profile_id::text || '/%';
 
+  delete from storage.objects
+  where bucket_id = 'crm-note-attachments'
+    and name like p_profile_id::text || '/%';
+
+  delete from storage.objects
+  where bucket_id = 'project-kanban-attachments'
+    and name like p_profile_id::text || '/%';
+
+  delete from storage.objects
+  where bucket_id = 'dashboard-note-attachments'
+    and name like p_profile_id::text || '/%';
+
   delete from auth.users
   where id = p_profile_id;
 end;
 $$;
 
-create index if not exists weekly_reports_profile_work_date_idx on public.weekly_reports (profile_id, work_date);
-create index if not exists weekly_reports_year_kw_idx on public.weekly_reports (year, kw);
-create index if not exists holiday_requests_profile_dates_idx on public.holiday_requests (profile_id, start_date, end_date);
-create index if not exists request_history_profile_created_at_idx on public.request_history (profile_id, created_at desc);
-create index if not exists daily_assignments_profile_date_idx on public.daily_assignments (profile_id, assignment_date);
-create index if not exists crm_contacts_last_name_idx on public.crm_contacts (last_name, first_name);
-create index if not exists properties_contact_created_idx on public.properties (contact_id, created_at desc);
-create index if not exists notes_target_uid_created_at_idx on public.notes (target_uid, created_at desc);
-create index if not exists project_kanban_notes_project_status_idx on public.project_kanban_notes (project_id, status, position);
+create index weekly_reports_profile_work_date_idx on public.weekly_reports (profile_id, work_date);
+create index weekly_reports_year_kw_idx on public.weekly_reports (year, kw);
+create index holiday_requests_profile_dates_idx on public.holiday_requests (profile_id, start_date, end_date);
+create index request_history_profile_created_at_idx on public.request_history (profile_id, created_at desc);
+create index daily_assignments_profile_date_idx on public.daily_assignments (profile_id, assignment_date);
+create index crm_contacts_last_name_idx on public.crm_contacts (last_name, first_name);
+create index properties_contact_created_idx on public.properties (contact_id, created_at desc);
+create index notes_target_uid_created_at_idx on public.notes (target_uid, created_at desc);
+create index project_kanban_notes_project_status_idx on public.project_kanban_notes (project_id, status, position);
+create index dashboard_notes_user_id_idx on public.dashboard_notes (user_id);
+create index dashboard_note_attachments_note_id_idx on public.dashboard_note_attachments (note_id);
 
-drop trigger if exists set_updated_at_app_profiles on public.app_profiles;
 create trigger set_updated_at_app_profiles
 before update on public.app_profiles
-for each row
-execute function public.set_updated_at();
+for each row execute function public.set_updated_at();
 
-drop trigger if exists set_updated_at_weekly_reports on public.weekly_reports;
+create trigger set_updated_at_projects
+before update on public.projects
+for each row execute function public.set_updated_at();
+
 create trigger set_updated_at_weekly_reports
 before update on public.weekly_reports
-for each row
-execute function public.set_updated_at();
+for each row execute function public.set_updated_at();
 
-drop trigger if exists set_updated_at_holiday_requests on public.holiday_requests;
 create trigger set_updated_at_holiday_requests
 before update on public.holiday_requests
-for each row
-execute function public.set_updated_at();
+for each row execute function public.set_updated_at();
 
-drop trigger if exists set_updated_at_daily_assignments on public.daily_assignments;
 create trigger set_updated_at_daily_assignments
 before update on public.daily_assignments
-for each row
-execute function public.set_updated_at();
+for each row execute function public.set_updated_at();
 
-drop trigger if exists set_updated_at_crm_contacts on public.crm_contacts;
 create trigger set_updated_at_crm_contacts
 before update on public.crm_contacts
-for each row
-execute function public.set_updated_at();
+for each row execute function public.set_updated_at();
 
-drop trigger if exists set_updated_at_properties on public.properties;
 create trigger set_updated_at_properties
 before update on public.properties
-for each row
-execute function public.set_updated_at();
+for each row execute function public.set_updated_at();
 
-drop trigger if exists set_updated_at_school_vacations on public.school_vacations;
 create trigger set_updated_at_school_vacations
 before update on public.school_vacations
-for each row
-execute function public.set_updated_at();
+for each row execute function public.set_updated_at();
+
+create trigger set_updated_at_project_kanban_notes
+before update on public.project_kanban_notes
+for each row execute function public.set_updated_at();
+
+create trigger set_updated_at_dashboard_notes
+before update on public.dashboard_notes
+for each row execute function public.set_updated_at();
+
+create trigger set_updated_at_dashboard_note_attachments
+before update on public.dashboard_note_attachments
+for each row execute function public.set_updated_at();
 
 alter table public.app_profiles enable row level security;
+alter table public.crm_contacts enable row level security;
+alter table public.properties enable row level security;
+alter table public.projects enable row level security;
+alter table public.platform_holidays enable row level security;
+alter table public.school_vacations enable row level security;
 alter table public.weekly_reports enable row level security;
 alter table public.holiday_requests enable row level security;
+alter table public.request_history enable row level security;
 alter table public.daily_assignments enable row level security;
+alter table public.material_entries enable row level security;
+alter table public.notes enable row level security;
+alter table public.project_kanban_notes enable row level security;
+alter table public.dashboard_notes enable row level security;
+alter table public.dashboard_note_attachments enable row level security;
 
--- Vollzugriff nur für Profile mit is_admin = true.
-drop policy if exists "app_profiles own or master" on public.app_profiles;
-drop policy if exists "app_profiles select own or master" on public.app_profiles;
-drop policy if exists "app_profiles insert own or master" on public.app_profiles;
-drop policy if exists "app_profiles update own or master" on public.app_profiles;
-drop policy if exists "app_profiles delete own or master" on public.app_profiles;
-drop policy if exists "weekly_reports own or master" on public.weekly_reports;
-drop policy if exists "holiday_requests own or master" on public.holiday_requests;
-drop policy if exists "authenticated full access app_profiles" on public.app_profiles;
-drop policy if exists "authenticated full access weekly_reports" on public.weekly_reports;
-drop policy if exists "authenticated full access holiday_requests" on public.holiday_requests;
-drop policy if exists "app_profiles own or admin" on public.app_profiles;
-drop policy if exists "app_profiles insert own or admin" on public.app_profiles;
-drop policy if exists "app_profiles update own or admin" on public.app_profiles;
-drop policy if exists "app_profiles delete own or admin" on public.app_profiles;
-drop policy if exists "weekly_reports own or admin" on public.weekly_reports;
-drop policy if exists "holiday_requests own or admin" on public.holiday_requests;
-drop policy if exists "daily_assignments own or admin" on public.daily_assignments;
-
-create policy "app_profiles own or admin"
+create policy "app_profiles select own or admin"
 on public.app_profiles
 for select
+to authenticated
 using (public.is_admin_user() or auth.uid() = id);
 
 create policy "app_profiles insert own or admin"
 on public.app_profiles
 for insert
+to authenticated
 with check (public.is_admin_user() or auth.uid() = id);
 
 create policy "app_profiles update own or admin"
 on public.app_profiles
 for update
+to authenticated
 using (public.is_admin_user() or auth.uid() = id)
 with check (public.is_admin_user() or auth.uid() = id);
 
 create policy "app_profiles delete own or admin"
 on public.app_profiles
 for delete
+to authenticated
 using (public.is_admin_user() or auth.uid() = id);
 
 create policy "weekly_reports own or admin"
 on public.weekly_reports
 for all
+to authenticated
 using (public.is_admin_user() or auth.uid() = profile_id)
 with check (public.is_admin_user() or auth.uid() = profile_id);
 
 create policy "holiday_requests own or admin"
 on public.holiday_requests
 for all
+to authenticated
 using (public.is_admin_user() or auth.uid() = profile_id)
 with check (public.is_admin_user() or auth.uid() = profile_id);
+
+create policy "request_history read own or admin"
+on public.request_history
+for select
+to authenticated
+using (public.is_admin_user() or auth.uid() = profile_id);
+
+create policy "request_history insert admin only"
+on public.request_history
+for insert
+to authenticated
+with check (public.is_admin_user());
 
 create policy "daily_assignments own or admin"
 on public.daily_assignments
 for all
+to authenticated
 using (public.is_admin_user() or auth.uid() = profile_id)
 with check (public.is_admin_user() or auth.uid() = profile_id);
+
+create policy "projects read authenticated"
+on public.projects
+for select
+to authenticated
+using (true);
+
+create policy "projects write admin"
+on public.projects
+for all
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
+create policy "platform_holidays read authenticated"
+on public.platform_holidays
+for select
+to authenticated
+using (true);
+
+create policy "platform_holidays write admin"
+on public.platform_holidays
+for all
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
+create policy "school_vacations read authenticated"
+on public.school_vacations
+for select
+to authenticated
+using (true);
+
+create policy "school_vacations write admin"
+on public.school_vacations
+for all
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
+create policy "crm_contacts admin access"
+on public.crm_contacts
+for all
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
+create policy "properties admin access"
+on public.properties
+for all
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
+create policy "material_entries admin access"
+on public.material_entries
+for all
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
+create policy "notes read own related or admin"
+on public.notes
+for select
+to authenticated
+using (
+  public.is_admin_user()
+  or auth.uid() = sender_uid
+  or auth.uid() = recipient_uid
+  or auth.uid() = target_uid
+);
+
+create policy "notes insert own sender or admin"
+on public.notes
+for insert
+to authenticated
+with check (
+  public.is_admin_user()
+  or auth.uid() = sender_uid
+);
+
+create policy "notes update own sender or admin"
+on public.notes
+for update
+to authenticated
+using (
+  public.is_admin_user()
+  or auth.uid() = sender_uid
+)
+with check (
+  public.is_admin_user()
+  or auth.uid() = sender_uid
+);
+
+create policy "notes delete own sender or admin"
+on public.notes
+for delete
+to authenticated
+using (
+  public.is_admin_user()
+  or auth.uid() = sender_uid
+);
+
+create policy "project_kanban_notes read authenticated"
+on public.project_kanban_notes
+for select
+to authenticated
+using (true);
+
+create policy "project_kanban_notes write admin"
+on public.project_kanban_notes
+for all
+to authenticated
+using (public.is_admin_user())
+with check (public.is_admin_user());
+
+create policy "dashboard notes read own or admin"
+on public.dashboard_notes
+for select
+to authenticated
+using (public.is_admin_user() or auth.uid() = user_id);
+
+create policy "dashboard notes write own or admin"
+on public.dashboard_notes
+for all
+to authenticated
+using (public.is_admin_user() or auth.uid() = user_id)
+with check (public.is_admin_user() or auth.uid() = user_id);
+
+create policy "dashboard attachments read own or admin"
+on public.dashboard_note_attachments
+for select
+to authenticated
+using (public.is_admin_user() or auth.uid() = user_id);
+
+create policy "dashboard attachments write own or admin"
+on public.dashboard_note_attachments
+for all
+to authenticated
+using (public.is_admin_user() or auth.uid() = user_id)
+with check (public.is_admin_user() or auth.uid() = user_id);
+
+-- WICHTIG: Diese GRANTS verhindern häufige 42501/"permission denied for table"-Fehler.
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant execute on function public.is_admin_user() to authenticated;
+grant execute on function public.approve_holiday_request(uuid, text, text) to authenticated;
+grant execute on function public.reject_holiday_request(uuid, text) to authenticated;
+grant execute on function public.purge_user_account(uuid) to authenticated;
+
+alter default privileges in schema public
+  grant select, insert, update, delete on tables to authenticated;
+
+alter default privileges in schema public
+  grant execute on functions to authenticated;
 
 insert into storage.buckets (id, name, public)
 values ('weekly-attachments', 'weekly-attachments', true)
@@ -854,22 +770,14 @@ insert into storage.buckets (id, name, public)
 values ('material-belege', 'material-belege', true)
 on conflict (id) do nothing;
 
-drop policy if exists "weekly attachment read own or master" on storage.objects;
-drop policy if exists "weekly attachment write own or master" on storage.objects;
-drop policy if exists "authenticated attachment read" on storage.objects;
-drop policy if exists "authenticated attachment write" on storage.objects;
-drop policy if exists "weekly attachment read own or admin" on storage.objects;
-drop policy if exists "weekly attachment write own or admin" on storage.objects;
-drop policy if exists "crm note attachment read own or admin" on storage.objects;
-drop policy if exists "crm note attachment write own or admin" on storage.objects;
-drop policy if exists "project kanban attachment read own or admin" on storage.objects;
-drop policy if exists "project kanban attachment write own or admin" on storage.objects;
-drop policy if exists "material attachment read own or admin" on storage.objects;
-drop policy if exists "material attachment write own or admin" on storage.objects;
+insert into storage.buckets (id, name, public)
+values ('dashboard-note-attachments', 'dashboard-note-attachments', true)
+on conflict (id) do nothing;
 
 create policy "weekly attachment read own or admin"
 on storage.objects
 for select
+to authenticated
 using (
   bucket_id = 'weekly-attachments'
   and (
@@ -881,6 +789,7 @@ using (
 create policy "weekly attachment write own or admin"
 on storage.objects
 for all
+to authenticated
 using (
   bucket_id = 'weekly-attachments'
   and (
@@ -899,6 +808,7 @@ with check (
 create policy "crm note attachment read own or admin"
 on storage.objects
 for select
+to authenticated
 using (
   bucket_id = 'crm-note-attachments'
   and (
@@ -910,6 +820,7 @@ using (
 create policy "crm note attachment write own or admin"
 on storage.objects
 for all
+to authenticated
 using (
   bucket_id = 'crm-note-attachments'
   and (
@@ -928,6 +839,7 @@ with check (
 create policy "project kanban attachment read own or admin"
 on storage.objects
 for select
+to authenticated
 using (
   bucket_id = 'project-kanban-attachments'
   and (
@@ -939,6 +851,7 @@ using (
 create policy "project kanban attachment write own or admin"
 on storage.objects
 for all
+to authenticated
 using (
   bucket_id = 'project-kanban-attachments'
   and (
@@ -954,17 +867,19 @@ with check (
   )
 );
 
-create policy "material attachment read own or admin"
+create policy "material attachment read admin"
 on storage.objects
 for select
+to authenticated
 using (
   bucket_id = 'material-belege'
   and public.is_admin_user()
 );
 
-create policy "material attachment write own or admin"
+create policy "material attachment write admin"
 on storage.objects
 for all
+to authenticated
 using (
   bucket_id = 'material-belege'
   and public.is_admin_user()
@@ -974,89 +889,10 @@ with check (
   and public.is_admin_user()
 );
 
-create table if not exists public.dashboard_notes (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.app_profiles(id) on delete cascade,
-  content text not null default '',
-  note_color text not null default 'yellow',
-  pos_x integer not null default 0,
-  pos_y integer not null default 0,
-  width integer not null default 320,
-  height integer not null default 220,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now()),
-  deleted_at timestamptz
-);
-
-alter table public.dashboard_notes
-add column if not exists note_color text not null default 'yellow';
-
-create table if not exists public.dashboard_note_attachments (
-  id uuid primary key default gen_random_uuid(),
-  note_id uuid not null references public.dashboard_notes(id) on delete cascade,
-  user_id uuid not null references public.app_profiles(id) on delete cascade,
-  file_name text not null,
-  file_path text not null,
-  file_mime_type text,
-  file_size_bytes bigint not null default 0,
-  created_at timestamptz not null default timezone('utc', now()),
-  updated_at timestamptz not null default timezone('utc', now()),
-  deleted_at timestamptz
-);
-
-create index if not exists dashboard_notes_user_id_idx
-on public.dashboard_notes (user_id);
-
-create index if not exists dashboard_note_attachments_note_id_idx
-on public.dashboard_note_attachments (note_id);
-
-create trigger set_dashboard_notes_updated_at
-before update on public.dashboard_notes
-for each row
-execute function public.set_updated_at();
-
-create trigger set_dashboard_note_attachments_updated_at
-before update on public.dashboard_note_attachments
-for each row
-execute function public.set_updated_at();
-
-alter table public.dashboard_notes enable row level security;
-alter table public.dashboard_note_attachments enable row level security;
-
-drop policy if exists "dashboard notes read own or admin" on public.dashboard_notes;
-create policy "dashboard notes read own or admin"
-on public.dashboard_notes
-for select
-using (public.is_admin_user() or auth.uid() = user_id);
-
-drop policy if exists "dashboard notes write own or admin" on public.dashboard_notes;
-create policy "dashboard notes write own or admin"
-on public.dashboard_notes
-for all
-using (public.is_admin_user() or auth.uid() = user_id)
-with check (public.is_admin_user() or auth.uid() = user_id);
-
-drop policy if exists "dashboard attachments read own or admin" on public.dashboard_note_attachments;
-create policy "dashboard attachments read own or admin"
-on public.dashboard_note_attachments
-for select
-using (public.is_admin_user() or auth.uid() = user_id);
-
-drop policy if exists "dashboard attachments write own or admin" on public.dashboard_note_attachments;
-create policy "dashboard attachments write own or admin"
-on public.dashboard_note_attachments
-for all
-using (public.is_admin_user() or auth.uid() = user_id)
-with check (public.is_admin_user() or auth.uid() = user_id);
-
-insert into storage.buckets (id, name, public)
-values ('dashboard-note-attachments', 'dashboard-note-attachments', true)
-on conflict (id) do nothing;
-
-drop policy if exists "dashboard attachment read own or admin" on storage.objects;
 create policy "dashboard attachment read own or admin"
 on storage.objects
 for select
+to authenticated
 using (
   bucket_id = 'dashboard-note-attachments'
   and (
@@ -1065,10 +901,10 @@ using (
   )
 );
 
-drop policy if exists "dashboard attachment write own or admin" on storage.objects;
 create policy "dashboard attachment write own or admin"
 on storage.objects
 for all
+to authenticated
 using (
   bucket_id = 'dashboard-note-attachments'
   and (
