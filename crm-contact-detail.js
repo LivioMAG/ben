@@ -23,6 +23,8 @@ function cacheElements() {
   elements.contactTitle = document.getElementById('contactTitle');
   elements.contactMeta = document.getElementById('contactMeta');
   elements.contactInfo = document.getElementById('contactInfo');
+  elements.contactAvatar = document.getElementById('contactAvatar');
+  elements.contactCategoryBadge = document.getElementById('contactCategoryBadge');
   elements.noteForm = document.getElementById('noteForm');
   elements.noteTextInput = document.getElementById('noteTextInput');
   elements.noteAttachmentInput = document.getElementById('noteAttachmentInput');
@@ -61,15 +63,20 @@ async function loadData() {
 
 function render() {
   const contact = state.contact;
-  elements.contactTitle.textContent = `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Kontakt';
-  elements.contactMeta.textContent = contact.company_name || 'Ohne Firma';
+  const fullName = `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Kontakt';
+  const category = contact.category || 'Ohne Kategorie';
+  const company = contact.company_name || 'Ohne Firma';
+  elements.contactTitle.textContent = fullName;
+  elements.contactMeta.textContent = company;
+  elements.contactCategoryBadge.textContent = category;
+  elements.contactAvatar.textContent = getInitials(contact.first_name, contact.last_name);
   elements.contactInfo.innerHTML = [
-    ['Kategorie', contact.category || '—'],
-    ['Firma', contact.company_name || '—'],
+    ['Firma', company],
+    ['Kategorie', category],
     ['Telefon', contact.phone || '—'],
     ['E-Mail', contact.email || '—'],
     ['Adresse', [contact.street, contact.postal_code, contact.city].filter(Boolean).join(', ') || '—'],
-  ].map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join('');
+  ].map(([key, value]) => `<div><dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
 
   const notes = normalizeContactNotes(contact.notizen);
   if (!notes.length) {
@@ -81,11 +88,11 @@ function render() {
     const author = resolveProfileLabel(note.authorUid || note.author_uid);
     const attachments = Array.isArray(note.attachments) ? note.attachments : [];
     const links = attachments.length
-      ? `<div>${attachments.map((attachment) => `<a href="${escapeAttribute(attachment.publicUrl || '#')}" target="_blank" rel="noopener">${escapeHtml(attachment.name || 'Anhang')}</a>`).join(' · ')}</div>`
+      ? `<ul class="attachments">${attachments.map((attachment) => `<li><span class="doc-name">${escapeHtml(attachment.name || 'Anhang')}</span><a class="doc-link" href="${escapeAttribute(attachment.publicUrl || '#')}" target="_blank" rel="noopener">Öffnen</a></li>`).join('')}</ul>`
       : '';
     return `<li>
-      <strong>${escapeHtml(createdAt)}</strong>
-      <div>${escapeHtml(note.text || '')}</div>
+      <div class="note-card-header"><strong class="note-date">${escapeHtml(createdAt)}</strong></div>
+      <div class="note-text">${escapeHtml(note.text || '')}</div>
       <div class="note-meta">Autor: ${escapeHtml(author)}</div>
       ${links}
     </li>`;
@@ -139,6 +146,16 @@ function resolveProfileLabel(profileId) {
   if (!profileId) return 'Unbekannt';
   const profile = state.profiles.find((entry) => String(entry.id) === String(profileId));
   return profile ? (profile.full_name || profile.email || profile.id) : profileId;
+}
+
+
+function getInitials(firstName, lastName) {
+  const initials = [firstName, lastName]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .map((value) => value.charAt(0).toUpperCase())
+    .join('');
+  return initials || 'K';
 }
 
 function formatDate(value) {

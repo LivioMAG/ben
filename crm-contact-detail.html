@@ -13,41 +13,51 @@
   </head>
   <body>
     <main class="detail-shell">
-      <header class="panel detail-header">
-        <div>
-          <span class="eyebrow">CRM</span>
-          <h1 id="contactTitle">Kontakt</h1>
-          <p id="contactMeta" class="subtle-text">–</p>
-        </div>
-        <button id="backButton" class="button" type="button">Zurück</button>
-      </header>
-
-      <section class="panel">
-        <h2>Kontaktinformationen</h2>
-        <dl id="contactInfo" class="info-grid"></dl>
-      </section>
-
-      <section class="panel">
-        <h2>Neue Notiz</h2>
-        <div id="alert" class="alert hidden"></div>
-        <form id="noteForm" class="form-grid">
-          <label class="full-width">
-            <span>Notiz *</span>
-            <textarea id="noteTextInput" rows="4" required></textarea>
-          </label>
-          <label class="full-width">
-            <span>Anhänge (PDF)</span>
-            <input id="noteAttachmentInput" type="file" accept="application/pdf,.pdf" multiple />
-          </label>
-          <div class="full-width">
-            <button id="saveNoteButton" class="button" type="submit">Notiz speichern</button>
+      <section class="hero panel">
+        <header class="detail-header">
+          <button id="backButton" class="button button-secondary" type="button">Zurück</button>
+          <span class="eyebrow">CRM Kontakt</span>
+        </header>
+        <div class="hero-content">
+          <div class="avatar" id="contactAvatar" aria-hidden="true">K</div>
+          <div class="hero-copy">
+            <h1 id="contactTitle">Kontakt</h1>
+            <p id="contactMeta" class="subtle-text">–</p>
           </div>
-        </form>
+          <span id="contactCategoryBadge" class="badge">Kategorie</span>
+        </div>
       </section>
 
-      <section class="panel">
-        <h2>Notizen</h2>
-        <ul id="notesList" class="notes-list"></ul>
+      <section class="detail-grid">
+        <section class="panel info-panel">
+          <h2>Kontaktinformationen</h2>
+          <dl id="contactInfo" class="info-grid"></dl>
+        </section>
+
+        <section class="content-stack">
+          <section class="panel notes-composer-panel">
+            <h2>Neue Notiz</h2>
+            <div id="alert" class="alert hidden"></div>
+            <form id="noteForm" class="form-grid">
+              <label class="full-width">
+                <span>Notiz *</span>
+                <textarea id="noteTextInput" rows="4" required></textarea>
+              </label>
+              <label class="full-width">
+                <span>Anhänge (PDF)</span>
+                <input id="noteAttachmentInput" type="file" accept="application/pdf,.pdf" multiple />
+              </label>
+              <div class="full-width form-actions">
+                <button id="saveNoteButton" class="button button-primary" type="submit">Notiz speichern</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="panel">
+            <h2>Notizen</h2>
+            <ul id="notesList" class="notes-list"></ul>
+          </section>
+        </section>
       </section>
     </main>
   </body>
