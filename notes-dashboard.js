@@ -746,13 +746,13 @@
         const previewSource = String(note.preview_text || this.getLatestConversationText(conversation));
         const cardPreview = this.getPreviewText(previewSource);
         const editorText = isEditing
-          ? (canEditLatestUser ? latestEditableText : cardPreview)
+          ? (canEditLatestUser ? latestEditableText : '')
           : cardPreview;
-        const showHistoryPanel = isExpanded && conversation.length > 1;
+        const showHistoryPanel = this.shouldShowHistoryPanel(isExpanded, conversation);
         const historyMarkup = showHistoryPanel ? `
           <aside class="dashboard-note-history-panel" aria-label="Verlauf">
             <ul class="dashboard-note-history-list">
-              ${[...conversation].reverse().map((entry) => `
+              ${this.getConversationHistoryForSidebar(conversation).map((entry) => `
                 <li class="dashboard-note-history-entry role-${this.escapeAttribute(entry.role)}">
                   <div class="dashboard-note-history-meta">${entry.role === 'ai' ? 'AI' : 'User'} · ${this.formatEntryTimestamp(entry.created_at)}</div>
                   <div class="dashboard-note-history-text">${this.escapeHtml(entry.text || '')}</div>
@@ -850,7 +850,7 @@
           : '<span>Notiz</span>';
         return `
           <article
-            class="dashboard-note ${String(this.activeNoteId) === String(note.id) ? 'active' : ''} ${isExpanded ? 'is-expanded' : ''} ${isEditing ? 'is-editing' : ''}"
+            class="dashboard-note ${String(this.activeNoteId) === String(note.id) ? 'active' : ''} ${isExpanded ? 'is-expanded' : ''} ${showHistoryPanel ? 'has-history' : ''} ${isEditing ? 'is-editing' : ''}"
             data-note-id="${this.escapeAttribute(note.id)}"
             style="left:${renderedLeft}px; top:${renderedTop}px; width:${renderedWidth}px; height:${renderedHeight}px; --dashboard-note-color:${this.escapeAttribute(NOTE_COLORS[noteColorKey])}; --dashboard-expanded-note-content-height:${expandedContentHeight}px;"
           >
@@ -883,7 +883,8 @@
     getExpandedWidth(note, canvasWidth = Number(this.canvas?.clientWidth || 0)) {
       const maxExpandedWidth = this.getExpandedMaxWidth(canvasWidth);
       const conversation = this.normalizeConversation(note?.conversation || note?.content);
-      const targetWidth = conversation.length > 1 ? EXPANDED_NOTE_WITH_HISTORY_WIDTH : EXPANDED_NOTE_FIXED_WIDTH;
+      const hasHistoryPanel = this.shouldShowHistoryPanel(true, conversation);
+      const targetWidth = hasHistoryPanel ? EXPANDED_NOTE_WITH_HISTORY_WIDTH : EXPANDED_NOTE_FIXED_WIDTH;
       return Math.max(240, Math.min(targetWidth, maxExpandedWidth));
     }
 
@@ -945,17 +946,38 @@
     }
 
     canEditLatestUserMessage(conversation) {
-      const normalized = this.normalizeConversation(conversation);
-      if (!normalized.length) return true;
-      const latest = normalized[normalized.length - 1];
-      return latest.role === 'user';
+      return Boolean(this.getLastEditableUserEntry(conversation));
     }
 
     getLatestEditableUserText(conversation) {
+      const lastEditableUserEntry = this.getLastEditableUserEntry(conversation);
+      if (!lastEditableUserEntry) return '';
+      return String(lastEditableUserEntry.text || '');
+    }
+
+    getLastEditableUserEntry(conversation) {
       const normalized = this.normalizeConversation(conversation);
-      if (!normalized.length) return '';
+      if (!normalized.length) return null;
       const latest = normalized[normalized.length - 1];
-      return latest.role === 'user' ? String(latest.text || '') : '';
+      if (latest.role !== 'user') return null;
+      return latest;
+    }
+
+    hasAiRespondedToLastUserEntry(conversation) {
+      const normalized = this.normalizeConversation(conversation);
+      if (!normalized.length) return false;
+      const latest = normalized[normalized.length - 1];
+      return latest.role === 'ai';
+    }
+
+    getConversationHistoryForSidebar(conversation) {
+      return [...this.normalizeConversation(conversation)].reverse();
+    }
+
+    shouldShowHistoryPanel(isExpanded, conversation) {
+      if (!isExpanded) return false;
+      const normalized = this.normalizeConversation(conversation);
+      return normalized.length > 0;
     }
 
     formatEntryTimestamp(value) {
