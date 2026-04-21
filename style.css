@@ -1148,11 +1148,19 @@ tbody tr:hover {
 .dashboard-note.is-expanded {
   z-index: 16;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.26);
-  overflow: auto;
+  overflow: hidden;
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .dashboard-note.is-expanded .dashboard-note-content {
-  max-height: none;
+  min-height: var(--dashboard-expanded-note-content-height, 200px);
+  max-height: var(--dashboard-expanded-note-content-height, 200px);
+  overflow: auto;
+}
+
+.dashboard-note.is-expanded .dashboard-note-todo-section {
+  min-height: 0;
+  overflow: auto;
 }
 
 .notes-dashboard-action-bar {
