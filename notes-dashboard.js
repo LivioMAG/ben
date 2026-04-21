@@ -1,6 +1,7 @@
 (function () {
   const DASHBOARD_TABLE = 'dashboard_notes';
   const ATTACHMENTS_TABLE = 'dashboard_note_attachments';
+  const TODOS_TABLE = 'dashboard_note_todos';
   const STORAGE_BUCKET = 'dashboard-note-attachments';
   const GRID_SIZE = 4;
   const DEFAULT_NOTE_WIDTH = 168;
@@ -10,6 +11,9 @@
   const DRAG_START_THRESHOLD_PX = 6;
   const EXPANDED_NOTE_WIDTH_MULTIPLIER = 2;
   const EXPANDED_NOTE_HEIGHT_MULTIPLIER = 2;
+  const EXPANDED_NOTE_TODO_BASE_EXTRA_HEIGHT = 72;
+  const EXPANDED_NOTE_TODO_ITEM_EXTRA_HEIGHT = 24;
+  const EXPANDED_NOTE_TODO_MAX_EXTRA_HEIGHT = 240;
   const DEFAULT_NOTE_COLOR = 'yellow';
   const NOTE_COLORS = {
     green: '#dff4df',
@@ -42,6 +46,7 @@
       this.editingNoteId = null;
       this.expandedNoteId = null;
       this.inlineSaveTimer = null;
+      this.todoSaveTimers = new Map();
       this.boundResize = this.handleViewportResize.bind(this);
 
       this.bindEvents();
@@ -70,7 +75,11 @@
       this.canvas.addEventListener('click', (event) => this.handleCanvasClick(event));
       this.canvas.addEventListener('dblclick', (event) => this.handleNoteDoubleClick(event));
       this.canvas.addEventListener('input', (event) => this.handleInlineEditorInput(event));
+      this.canvas.addEventListener('input', (event) => this.handleTodoInput(event));
+      this.canvas.addEventListener('change', (event) => this.handleTodoToggle(event));
+      this.canvas.addEventListener('keydown', (event) => this.handleTodoKeyDown(event));
       this.canvas.addEventListener('focusout', (event) => this.handleInlineEditorFocusOut(event));
+      this.canvas.addEventListener('focusout', (event) => this.handleTodoFocusOut(event));
 
       if (this.attachmentModal) {
         this.attachmentModal.addEventListener('click', (event) => this.handleAttachmentModalClick(event));
@@ -91,6 +100,8 @@
         window.clearTimeout(this.inlineSaveTimer);
         this.inlineSaveTimer = null;
       }
+      this.todoSaveTimers.forEach((timerId) => window.clearTimeout(timerId));
+      this.todoSaveTimers.clear();
     }
 
     async refresh() {
@@ -99,7 +110,11 @@
       if (!supabase || !userId || !this.canvas) return;
 
       try {
-        const [{ data: notes, error: notesError }, { data: attachments, error: attachmentsError }] = await Promise.all([
+        const [
+          { data: notes, error: notesError },
+          { data: attachments, error: attachmentsError },
+          { data: todos, error: todosError },
+        ] = await Promise.all([
           supabase
             .from(DASHBOARD_TABLE)
             .select('*')
@@ -112,15 +127,24 @@
             .eq('user_id', userId)
             .is('deleted_at', null)
             .order('created_at', { ascending: true }),
+          supabase
+            .from(TODOS_TABLE)
+            .select('*')
+            .eq('user_id', userId)
+            .is('deleted_at', null)
+            .order('position', { ascending: true })
+            .order('created_at', { ascending: true }),
         ]);
 
         if (notesError) throw notesError;
         if (attachmentsError) throw attachmentsError;
+        if (todosError) throw todosError;
 
         this.notes = (notes || []).map((note) => ({
           ...note,
           note_color: this.normalizeNoteColor(note.note_color),
           attachments: (attachments || []).filter((attachment) => String(attachment.note_id) === String(note.id)),
+          todos: (todos || []).filter((todo) => String(todo.note_id) === String(note.id)),
         }));
         this.normalizeAllPositions();
         this.render();
@@ -134,6 +158,8 @@
       this.activeNoteId = null;
       this.dragState = null;
       this.clearPressState();
+      this.todoSaveTimers.forEach((timerId) => window.clearTimeout(timerId));
+      this.todoSaveTimers.clear();
       this.render();
       this.hideActionBar();
       this.closeAttachmentModal();
@@ -176,7 +202,7 @@
 
       if (error) throw error;
 
-      this.notes.push({ ...data, attachments: [] });
+      this.notes.push({ ...data, attachments: [], todos: [] });
       this.activeNoteId = data.id;
       this.startInlineEditing(data.id);
     }
@@ -238,7 +264,7 @@
     isEditableInteractionTarget(target, noteId) {
       if (!(target instanceof HTMLElement)) return false;
       if (String(this.editingNoteId) !== String(noteId)) return false;
-      return Boolean(target.closest('.dashboard-note-content'));
+      return Boolean(target.closest('.dashboard-note-content') || target.closest('.dashboard-note-todo-list'));
     }
 
     handleCanvasClick(event) {
@@ -263,6 +289,8 @@
       const action = actionTrigger?.getAttribute('data-note-action');
       if (action === 'attachments') {
         this.openAttachmentModal(note.id);
+      } else if (action === 'add-todo') {
+        this.createTodo(note.id).catch((error) => this.reportError('To-do konnte nicht erstellt werden.', error));
       } else if (action === 'collapse') {
         this.collapseExpandedNote(note.id);
       }
@@ -496,6 +524,7 @@
       await Promise.all([
         supabase.from(DASHBOARD_TABLE).update({ deleted_at: deletedAt }).eq('id', noteId),
         supabase.from(ATTACHMENTS_TABLE).update({ deleted_at: deletedAt }).eq('note_id', noteId),
+        supabase.from(TODOS_TABLE).update({ deleted_at: deletedAt }).eq('note_id', noteId),
       ]);
       this.notes = this.notes.filter((entry) => String(entry.id) !== String(noteId));
       if (String(this.activeNoteId) === String(noteId)) {
@@ -688,10 +717,14 @@
         const isEditing = String(this.editingNoteId) === String(note.id);
         const preview = this.getPreviewText(content, isExpanded || isEditing);
         const attachmentCount = Array.isArray(note.attachments) ? note.attachments.length : 0;
+        const todoItems = Array.isArray(note.todos) ? note.todos : [];
+        const todoCount = todoItems.length;
         const noteWidth = Number(note.width || DEFAULT_NOTE_WIDTH);
         const noteHeight = Number(note.height || DEFAULT_NOTE_HEIGHT);
         const renderedWidth = isExpanded ? noteWidth * EXPANDED_NOTE_WIDTH_MULTIPLIER : noteWidth;
-        const renderedHeight = isExpanded ? noteHeight * EXPANDED_NOTE_HEIGHT_MULTIPLIER : noteHeight;
+        const renderedHeight = isExpanded
+          ? (noteHeight * EXPANDED_NOTE_HEIGHT_MULTIPLIER) + this.getExpandedTodoExtraHeight(todoCount)
+          : noteHeight;
         const noteColorKey = this.normalizeNoteColor(note.note_color);
         const colorDots = Object.entries(NOTE_COLORS).map(([key, value]) => `
           <button
@@ -702,6 +735,30 @@
             aria-label="Notizfarbe ${this.escapeAttribute(key)} auswählen"
           ></button>
         `).join('');
+        const todoMarkup = isExpanded ? `
+          <section class="dashboard-note-todo-section">
+            <ul class="dashboard-note-todo-list">
+              ${todoItems.map((todo) => `
+                <li class="dashboard-note-todo-item ${todo.is_done ? 'is-done' : ''}" data-todo-id="${this.escapeAttribute(todo.id)}">
+                  <input
+                    type="checkbox"
+                    class="dashboard-note-todo-checkbox"
+                    data-todo-checkbox="true"
+                    ${todo.is_done ? 'checked' : ''}
+                    aria-label="To-do abhaken"
+                  />
+                  <input
+                    type="text"
+                    class="dashboard-note-todo-input"
+                    data-todo-input="true"
+                    value="${this.escapeAttribute(todo.content || '')}"
+                    placeholder="To-do hinzufügen"
+                  />
+                </li>
+              `).join('')}
+            </ul>
+          </section>
+        ` : '';
         return `
           <article
             class="dashboard-note ${String(this.activeNoteId) === String(note.id) ? 'active' : ''} ${isExpanded ? 'is-expanded' : ''} ${isEditing ? 'is-editing' : ''}"
@@ -709,6 +766,7 @@
             style="left:${Number(note.pos_x || 0)}px; top:${Number(note.pos_y || 0)}px; width:${renderedWidth}px; height:${renderedHeight}px; --dashboard-note-color:${this.escapeAttribute(NOTE_COLORS[noteColorKey])};"
           >
             <div class="dashboard-note-content" contenteditable="${isEditing ? 'true' : 'false'}" spellcheck="true">${this.escapeHtml(preview || ' ')}</div>
+            ${todoMarkup}
             <footer class="dashboard-note-footer">
               <div class="dashboard-note-footer-left">
                 <span>${isEditing ? 'Bearbeiten' : 'Kurzansicht'}</span>
@@ -716,6 +774,7 @@
               </div>
               <div class="dashboard-note-footer-actions">
                 <button type="button" class="dashboard-note-icon-button" data-note-action="attachments" aria-label="Anhänge öffnen">📎 ${attachmentCount}</button>
+                ${isExpanded ? '<button type="button" class="dashboard-note-icon-button" data-note-action="add-todo" aria-label="To-do hinzufügen">☑️</button>' : ''}
               </div>
             </footer>
           </article>
@@ -729,6 +788,12 @@
         return content;
       }
       return `${content.slice(0, CARD_PREVIEW_MAX_LENGTH)}...`;
+    }
+
+    getExpandedTodoExtraHeight(todoCount) {
+      if (!todoCount) return 0;
+      const desiredHeight = EXPANDED_NOTE_TODO_BASE_EXTRA_HEIGHT + (todoCount * EXPANDED_NOTE_TODO_ITEM_EXTRA_HEIGHT);
+      return Math.min(EXPANDED_NOTE_TODO_MAX_EXTRA_HEIGHT, desiredHeight);
     }
 
     focusInlineEditorIfNeeded() {
@@ -813,6 +878,132 @@
       if (!supabase || !note) return;
       note.content = String(content || '');
       const { error } = await supabase.from(DASHBOARD_TABLE).update({ content: note.content }).eq('id', note.id);
+      if (error) throw error;
+    }
+
+    getTodoById(todoId) {
+      for (const note of this.notes) {
+        const todo = (note.todos || []).find((entry) => String(entry.id) === String(todoId));
+        if (todo) {
+          return { note, todo };
+        }
+      }
+      return null;
+    }
+
+    async createTodo(noteId) {
+      const supabase = this.getSupabase();
+      const userId = this.getUserId();
+      if (!supabase || !userId) return;
+      const note = this.notes.find((entry) => String(entry.id) === String(noteId));
+      if (!note) return;
+
+      const nextPosition = (note.todos || []).length;
+      const { data, error } = await supabase
+        .from(TODOS_TABLE)
+        .insert({
+          note_id: note.id,
+          user_id: userId,
+          content: '',
+          is_done: false,
+          position: nextPosition,
+        })
+        .select('*')
+        .single();
+      if (error) throw error;
+
+      note.todos = [...(note.todos || []), data];
+      this.expandedNoteId = note.id;
+      this.editingNoteId = note.id;
+      this.render();
+
+      window.requestAnimationFrame(() => {
+        const selector = `.dashboard-note[data-note-id="${CSS.escape(String(note.id))}"] .dashboard-note-todo-item[data-todo-id="${CSS.escape(String(data.id))}"] .dashboard-note-todo-input`;
+        const input = this.canvas?.querySelector(selector);
+        if (input instanceof HTMLInputElement) {
+          input.focus();
+        }
+      });
+    }
+
+    handleTodoInput(event) {
+      const input = event.target instanceof HTMLInputElement ? event.target.closest('.dashboard-note-todo-input') : null;
+      if (!(input instanceof HTMLInputElement)) return;
+      const todoItem = input.closest('.dashboard-note-todo-item');
+      const todoId = todoItem?.getAttribute('data-todo-id');
+      if (!todoId) return;
+
+      const pair = this.getTodoById(todoId);
+      if (!pair) return;
+      pair.todo.content = input.value || '';
+      this.scheduleTodoSave(todoId);
+    }
+
+    handleTodoToggle(event) {
+      const checkbox = event.target instanceof HTMLInputElement ? event.target.closest('.dashboard-note-todo-checkbox') : null;
+      if (!(checkbox instanceof HTMLInputElement)) return;
+      const todoItem = checkbox.closest('.dashboard-note-todo-item');
+      const todoId = todoItem?.getAttribute('data-todo-id');
+      if (!todoId) return;
+
+      const pair = this.getTodoById(todoId);
+      if (!pair) return;
+      pair.todo.is_done = Boolean(checkbox.checked);
+      this.render();
+      this.persistTodoSave(todoId).catch((error) => this.reportError('To-do konnte nicht gespeichert werden.', error));
+    }
+
+    handleTodoKeyDown(event) {
+      const input = event.target instanceof HTMLInputElement ? event.target.closest('.dashboard-note-todo-input') : null;
+      if (!(input instanceof HTMLInputElement)) return;
+      if (event.key !== 'Enter') return;
+
+      event.preventDefault();
+      const noteElement = input.closest('.dashboard-note');
+      const noteId = noteElement?.getAttribute('data-note-id');
+      if (!noteId) return;
+      this.createTodo(noteId).catch((error) => this.reportError('To-do konnte nicht erstellt werden.', error));
+    }
+
+    handleTodoFocusOut(event) {
+      const input = event.target instanceof HTMLInputElement ? event.target.closest('.dashboard-note-todo-input') : null;
+      if (!(input instanceof HTMLInputElement)) return;
+      const todoItem = input.closest('.dashboard-note-todo-item');
+      const todoId = todoItem?.getAttribute('data-todo-id');
+      if (!todoId) return;
+      this.persistTodoSave(todoId).catch((error) => this.reportError('To-do konnte nicht gespeichert werden.', error));
+    }
+
+    scheduleTodoSave(todoId) {
+      const key = String(todoId);
+      const existingTimer = this.todoSaveTimers.get(key);
+      if (existingTimer) {
+        window.clearTimeout(existingTimer);
+      }
+      const timerId = window.setTimeout(() => {
+        this.persistTodoSave(todoId).catch((error) => this.reportError('To-do konnte nicht gespeichert werden.', error));
+      }, 350);
+      this.todoSaveTimers.set(key, timerId);
+    }
+
+    async persistTodoSave(todoId) {
+      const key = String(todoId);
+      const timerId = this.todoSaveTimers.get(key);
+      if (timerId) {
+        window.clearTimeout(timerId);
+        this.todoSaveTimers.delete(key);
+      }
+      const pair = this.getTodoById(todoId);
+      const supabase = this.getSupabase();
+      if (!pair || !supabase) return;
+      const { todo } = pair;
+      const { error } = await supabase
+        .from(TODOS_TABLE)
+        .update({
+          content: String(todo.content || ''),
+          is_done: Boolean(todo.is_done),
+        })
+        .eq('id', todo.id);
       if (error) throw error;
     }
 
