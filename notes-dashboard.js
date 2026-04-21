@@ -9,7 +9,6 @@
   const CARD_PREVIEW_MAX_LENGTH = 80;
   const LONG_PRESS_DELAY_MS = 520;
   const DRAG_START_THRESHOLD_PX = 6;
-  const EXPANDED_NOTE_WIDTH_MULTIPLIER = 2;
   const EXPANDED_NOTE_TODO_MAX_ITEMS = 10;
   const EXPANDED_NOTE_TODO_BASE_EXTRA_HEIGHT = 12;
   const EXPANDED_NOTE_TODO_ITEM_EXTRA_HEIGHT = 30;
@@ -77,6 +76,7 @@
       this.canvas.addEventListener('input', (event) => this.handleTodoInput(event));
       this.canvas.addEventListener('change', (event) => this.handleTodoToggle(event));
       this.canvas.addEventListener('keydown', (event) => this.handleTodoKeyDown(event));
+      this.canvas.addEventListener('click', (event) => this.handleTodoDeleteClick(event));
       this.canvas.addEventListener('focusout', (event) => this.handleInlineEditorFocusOut(event));
       this.canvas.addEventListener('focusout', (event) => this.handleTodoFocusOut(event));
 
@@ -723,10 +723,16 @@
         const progressPercent = clampedTodoCount ? Math.round((completedTodoCount / clampedTodoCount) * 100) : 0;
         const noteWidth = Number(note.width || DEFAULT_NOTE_WIDTH);
         const noteHeight = Number(note.height || DEFAULT_NOTE_HEIGHT);
-        const renderedWidth = isExpanded ? noteWidth * EXPANDED_NOTE_WIDTH_MULTIPLIER : noteWidth;
+        const canvasWidth = Number(this.canvas?.clientWidth || 0);
+        const canvasHeight = Number(this.canvas?.clientHeight || 0);
+        const renderedWidth = isExpanded
+          ? Math.max(noteWidth, canvasWidth - 24)
+          : noteWidth;
         const renderedHeight = isExpanded
-          ? noteHeight + this.getExpandedTodoExtraHeight(clampedTodoCount)
+          ? Math.max(noteHeight + this.getExpandedTodoExtraHeight(clampedTodoCount), canvasHeight - 24)
           : noteHeight;
+        const renderedLeft = isExpanded ? 12 : Number(note.pos_x || 0);
+        const renderedTop = isExpanded ? 12 : Number(note.pos_y || 0);
         const noteColorKey = this.normalizeNoteColor(note.note_color);
         const colorDots = Object.entries(NOTE_COLORS).map(([key, value]) => `
           <button
@@ -749,13 +755,21 @@
                     ${todo.is_done ? 'checked' : ''}
                     aria-label="To-do abhaken"
                   />
-                  <input
-                    type="text"
+                  <span
                     class="dashboard-note-todo-input"
                     data-todo-input="true"
-                    value="${this.escapeAttribute(todo.content || '')}"
-                    placeholder="To-do hinzufügen"
-                  />
+                    contenteditable="true"
+                    role="textbox"
+                    aria-label="To-do Text"
+                    spellcheck="true"
+                  >${this.escapeHtml(todo.content || '')}</span>
+                  <button
+                    type="button"
+                    class="dashboard-note-todo-delete"
+                    data-todo-delete="true"
+                    aria-label="To-do löschen"
+                    title="To-do löschen"
+                  >✕</button>
                 </li>
               `).join('')}
             </ul>
@@ -775,7 +789,7 @@
           <article
             class="dashboard-note ${String(this.activeNoteId) === String(note.id) ? 'active' : ''} ${isExpanded ? 'is-expanded' : ''} ${isEditing ? 'is-editing' : ''}"
             data-note-id="${this.escapeAttribute(note.id)}"
-            style="left:${Number(note.pos_x || 0)}px; top:${Number(note.pos_y || 0)}px; width:${renderedWidth}px; height:${renderedHeight}px; --dashboard-note-color:${this.escapeAttribute(NOTE_COLORS[noteColorKey])};"
+            style="left:${renderedLeft}px; top:${renderedTop}px; width:${renderedWidth}px; height:${renderedHeight}px; --dashboard-note-color:${this.escapeAttribute(NOTE_COLORS[noteColorKey])};"
           >
             <div class="dashboard-note-content" contenteditable="${isEditing ? 'true' : 'false'}" spellcheck="true">${this.escapeHtml(preview || ' ')}</div>
             ${todoMarkup}
@@ -935,22 +949,22 @@
       window.requestAnimationFrame(() => {
         const selector = `.dashboard-note[data-note-id="${CSS.escape(String(note.id))}"] .dashboard-note-todo-item[data-todo-id="${CSS.escape(String(data.id))}"] .dashboard-note-todo-input`;
         const input = this.canvas?.querySelector(selector);
-        if (input instanceof HTMLInputElement) {
+        if (input instanceof HTMLElement) {
           input.focus();
         }
       });
     }
 
     handleTodoInput(event) {
-      const input = event.target instanceof HTMLInputElement ? event.target.closest('.dashboard-note-todo-input') : null;
-      if (!(input instanceof HTMLInputElement)) return;
+      const input = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note-todo-input') : null;
+      if (!(input instanceof HTMLElement)) return;
       const todoItem = input.closest('.dashboard-note-todo-item');
       const todoId = todoItem?.getAttribute('data-todo-id');
       if (!todoId) return;
 
       const pair = this.getTodoById(todoId);
       if (!pair) return;
-      pair.todo.content = input.value || '';
+      pair.todo.content = input.textContent || '';
       this.scheduleTodoSave(todoId);
     }
 
@@ -969,24 +983,55 @@
     }
 
     handleTodoKeyDown(event) {
-      const input = event.target instanceof HTMLInputElement ? event.target.closest('.dashboard-note-todo-input') : null;
-      if (!(input instanceof HTMLInputElement)) return;
-      if (event.key !== 'Enter') return;
-
+      const input = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note-todo-input') : null;
+      if (!(input instanceof HTMLElement)) return;
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        const noteElement = input.closest('.dashboard-note');
+        const noteId = noteElement?.getAttribute('data-note-id');
+        if (!noteId) return;
+        this.createTodo(noteId).catch((error) => this.reportError('To-do konnte nicht erstellt werden.', error));
+        return;
+      }
+      if (event.key !== 'Backspace') return;
+      const content = String(input.textContent || '').trim();
+      if (content) return;
       event.preventDefault();
-      const noteElement = input.closest('.dashboard-note');
-      const noteId = noteElement?.getAttribute('data-note-id');
-      if (!noteId) return;
-      this.createTodo(noteId).catch((error) => this.reportError('To-do konnte nicht erstellt werden.', error));
+      const todoItem = input.closest('.dashboard-note-todo-item');
+      const todoId = todoItem?.getAttribute('data-todo-id');
+      if (!todoId) return;
+      this.deleteTodo(todoId).catch((error) => this.reportError('To-do konnte nicht gelöscht werden.', error));
     }
 
     handleTodoFocusOut(event) {
-      const input = event.target instanceof HTMLInputElement ? event.target.closest('.dashboard-note-todo-input') : null;
-      if (!(input instanceof HTMLInputElement)) return;
+      const input = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note-todo-input') : null;
+      if (!(input instanceof HTMLElement)) return;
       const todoItem = input.closest('.dashboard-note-todo-item');
       const todoId = todoItem?.getAttribute('data-todo-id');
       if (!todoId) return;
       this.persistTodoSave(todoId).catch((error) => this.reportError('To-do konnte nicht gespeichert werden.', error));
+    }
+
+    handleTodoDeleteClick(event) {
+      const deleteTrigger = event.target instanceof HTMLElement ? event.target.closest('[data-todo-delete="true"]') : null;
+      if (!deleteTrigger) return;
+      const todoItem = deleteTrigger.closest('.dashboard-note-todo-item');
+      const todoId = todoItem?.getAttribute('data-todo-id');
+      if (!todoId) return;
+      this.deleteTodo(todoId).catch((error) => this.reportError('To-do konnte nicht gelöscht werden.', error));
+    }
+
+    async deleteTodo(todoId) {
+      const pair = this.getTodoById(todoId);
+      const supabase = this.getSupabase();
+      if (!pair || !supabase) return;
+      const { note, todo } = pair;
+      const { error } = await supabase.from(TODOS_TABLE).update({
+        deleted_at: new Date().toISOString(),
+      }).eq('id', todo.id);
+      if (error) throw error;
+      note.todos = (note.todos || []).filter((entry) => String(entry.id) !== String(todo.id));
+      this.render();
     }
 
     scheduleTodoSave(todoId) {
