@@ -958,7 +958,7 @@ tbody tr:hover {
     linear-gradient(rgba(17, 17, 17, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(17, 17, 17, 0.03) 1px, transparent 1px),
     rgba(255, 255, 255, 0.7);
-  background-size: 8px 8px;
+  background-size: 4px 4px;
 }
 
 .dashboard-note-empty {

@@ -2,7 +2,7 @@
   const DASHBOARD_TABLE = 'dashboard_notes';
   const ATTACHMENTS_TABLE = 'dashboard_note_attachments';
   const STORAGE_BUCKET = 'dashboard-note-attachments';
-  const GRID_SIZE = 8;
+  const GRID_SIZE = 4;
   const DEFAULT_NOTE_WIDTH = 168;
   const DEFAULT_NOTE_HEIGHT = 120;
   const CARD_PREVIEW_MAX_LENGTH = 80;
@@ -12,10 +12,16 @@
   const EXPANDED_NOTE_HEIGHT_MULTIPLIER = 2;
   const DEFAULT_NOTE_COLOR = 'yellow';
   const NOTE_COLORS = {
-    yellow: '#fff2b8',
-    blue: '#dcecff',
     green: '#dff4df',
-    pink: '#ffe0ec',
+    blue: '#dcecff',
+    yellow: '#fff2b8',
+    red: '#ffd7d7',
+  };
+  const COLOR_STACK_ORDER = {
+    green: 0,
+    blue: 1,
+    yellow: 2,
+    red: 3,
   };
 
   class NotesDashboard {
@@ -662,7 +668,21 @@
         return;
       }
 
-      this.canvas.innerHTML = this.notes.map((note) => {
+      const notesForRender = this.notes
+        .map((note, index) => ({ note, index }))
+        .sort((left, right) => {
+          const leftColor = this.normalizeNoteColor(left.note.note_color);
+          const rightColor = this.normalizeNoteColor(right.note.note_color);
+          const leftPriority = COLOR_STACK_ORDER[leftColor] ?? Number.MAX_SAFE_INTEGER;
+          const rightPriority = COLOR_STACK_ORDER[rightColor] ?? Number.MAX_SAFE_INTEGER;
+          if (leftPriority !== rightPriority) {
+            return leftPriority - rightPriority;
+          }
+          return left.index - right.index;
+        })
+        .map((entry) => entry.note);
+
+      this.canvas.innerHTML = notesForRender.map((note) => {
         const content = String(note.content || '');
         const isExpanded = String(this.expandedNoteId) === String(note.id);
         const isEditing = String(this.editingNoteId) === String(note.id);
@@ -797,6 +817,9 @@
     }
 
     normalizeNoteColor(colorValue) {
+      if (colorValue === 'pink') {
+        return 'red';
+      }
       return NOTE_COLORS[colorValue] ? colorValue : DEFAULT_NOTE_COLOR;
     }
 
