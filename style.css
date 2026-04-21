@@ -1153,14 +1153,15 @@ tbody tr:hover {
 }
 
 .dashboard-note.is-expanded .dashboard-note-content {
-  min-height: var(--dashboard-expanded-note-content-height, 200px);
-  max-height: var(--dashboard-expanded-note-content-height, 200px);
+  min-height: var(--dashboard-expanded-note-content-height, 140px);
+  max-height: var(--dashboard-expanded-note-content-height, 140px);
   overflow: auto;
 }
 
 .dashboard-note.is-expanded .dashboard-note-todo-section {
   min-height: 0;
-  overflow: visible;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .notes-dashboard-action-bar {
