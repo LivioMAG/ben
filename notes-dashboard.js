@@ -12,6 +12,9 @@
   const EXPANDED_NOTE_TODO_MAX_ITEMS = 10;
   const EXPANDED_NOTE_TODO_BASE_EXTRA_HEIGHT = 12;
   const EXPANDED_NOTE_TODO_ITEM_EXTRA_HEIGHT = 30;
+  const EXPANDED_NOTE_SIZE_STEP = 28;
+  const EXPANDED_NOTE_PADDING = 12;
+  const EXPANDED_NOTE_MEASURE_GUARD = 60;
   const DEFAULT_NOTE_COLOR = 'yellow';
   const NOTE_COLORS = {
     green: '#dff4df',
@@ -726,13 +729,13 @@
         const canvasWidth = Number(this.canvas?.clientWidth || 0);
         const canvasHeight = Number(this.canvas?.clientHeight || 0);
         const renderedWidth = isExpanded
-          ? Math.max(noteWidth, canvasWidth - 24)
+          ? this.getExpandedInitialWidth(noteWidth, canvasWidth)
           : noteWidth;
         const renderedHeight = isExpanded
-          ? Math.max(noteHeight + this.getExpandedTodoExtraHeight(clampedTodoCount), canvasHeight - 24)
+          ? this.getExpandedInitialHeight(noteHeight + this.getExpandedTodoExtraHeight(clampedTodoCount), canvasHeight)
           : noteHeight;
-        const renderedLeft = isExpanded ? 12 : Number(note.pos_x || 0);
-        const renderedTop = isExpanded ? 12 : Number(note.pos_y || 0);
+        const renderedLeft = isExpanded ? EXPANDED_NOTE_PADDING : Number(note.pos_x || 0);
+        const renderedTop = isExpanded ? EXPANDED_NOTE_PADDING : Number(note.pos_y || 0);
         const noteColorKey = this.normalizeNoteColor(note.note_color);
         const colorDots = Object.entries(NOTE_COLORS).map(([key, value]) => `
           <button
@@ -806,7 +809,53 @@
           </article>
         `;
       }).join('');
+      this.adjustExpandedNoteSize();
       this.focusInlineEditorIfNeeded();
+    }
+
+    getExpandedInitialWidth(noteWidth, canvasWidth) {
+      const maxExpandedWidth = this.getExpandedMaxWidth(canvasWidth);
+      return Math.max(240, Math.min(Math.max(140, noteWidth), maxExpandedWidth));
+    }
+
+    getExpandedInitialHeight(noteHeight, canvasHeight) {
+      const maxExpandedHeight = this.getExpandedMaxHeight(canvasHeight);
+      return Math.max(140, Math.min(Math.max(96, noteHeight), maxExpandedHeight));
+    }
+
+    getExpandedMaxWidth(canvasWidth = Number(this.canvas?.clientWidth || 0)) {
+      return Math.max(240, canvasWidth - (EXPANDED_NOTE_PADDING * 2));
+    }
+
+    getExpandedMaxHeight(canvasHeight = Number(this.canvas?.clientHeight || 0)) {
+      return Math.max(140, canvasHeight - (EXPANDED_NOTE_PADDING * 2));
+    }
+
+    adjustExpandedNoteSize() {
+      if (!this.canvas || !this.expandedNoteId) return;
+      const selector = `.dashboard-note[data-note-id="${CSS.escape(String(this.expandedNoteId))}"]`;
+      const noteElement = this.canvas.querySelector(selector);
+      if (!(noteElement instanceof HTMLElement)) return;
+
+      let width = Number(noteElement.offsetWidth || 0);
+      let height = Number(noteElement.offsetHeight || 0);
+      const maxWidth = this.getExpandedMaxWidth();
+      const maxHeight = this.getExpandedMaxHeight();
+
+      for (let guard = 0; guard < EXPANDED_NOTE_MEASURE_GUARD; guard += 1) {
+        const overflowsX = noteElement.scrollWidth > noteElement.clientWidth + 1;
+        const overflowsY = noteElement.scrollHeight > noteElement.clientHeight + 1;
+        if (!overflowsX && !overflowsY) break;
+
+        const nextWidth = overflowsX ? Math.min(maxWidth, width + EXPANDED_NOTE_SIZE_STEP) : width;
+        const nextHeight = overflowsY ? Math.min(maxHeight, height + EXPANDED_NOTE_SIZE_STEP) : height;
+        if (nextWidth === width && nextHeight === height) break;
+
+        width = nextWidth;
+        height = nextHeight;
+        noteElement.style.width = `${width}px`;
+        noteElement.style.height = `${height}px`;
+      }
     }
 
     getPreviewText(content, showFullText) {
@@ -858,6 +907,7 @@
       const note = this.notes.find((entry) => String(entry.id) === String(noteId));
       if (!note) return;
       note.content = contentEl.textContent || '';
+      this.adjustExpandedNoteSize();
       this.scheduleInlineSave(note.id);
     }
 
@@ -965,6 +1015,7 @@
       const pair = this.getTodoById(todoId);
       if (!pair) return;
       pair.todo.content = input.textContent || '';
+      this.adjustExpandedNoteSize();
       this.scheduleTodoSave(todoId);
     }
 
