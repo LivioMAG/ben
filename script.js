@@ -934,13 +934,6 @@ function cacheElements() {
   elements.notesDashboardPanel = document.getElementById('notesDashboardPanel');
   elements.notesDashboardCanvas = document.getElementById('notesDashboardCanvas');
   elements.notesDashboardActionBar = document.getElementById('notesDashboardActionBar');
-  elements.notesDetailModal = document.getElementById('notesDetailModal');
-  elements.notesDetailContentInput = document.getElementById('notesDetailContentInput');
-  elements.notesDetailAttachmentsList = document.getElementById('notesDetailAttachmentsList');
-  elements.notesDetailAttachmentInput = document.getElementById('notesDetailAttachmentInput');
-  elements.saveNotesDetailButton = document.getElementById('saveNotesDetailButton');
-  elements.deleteNotesDetailButton = document.getElementById('deleteNotesDetailButton');
-  elements.closeNotesDetailButton = document.getElementById('closeNotesDetailButton');
   elements.noteAttachmentModal = document.getElementById('noteAttachmentModal');
   elements.noteAttachmentList = document.getElementById('noteAttachmentList');
   elements.noteAttachmentFileInput = document.getElementById('noteAttachmentFileInput');
@@ -955,13 +948,6 @@ function setupNotesDashboard() {
     root: elements.notesDashboardPanel,
     canvas: elements.notesDashboardCanvas,
     actionBar: elements.notesDashboardActionBar,
-    modal: elements.notesDetailModal,
-    modalTextarea: elements.notesDetailContentInput,
-    modalAttachments: elements.notesDetailAttachmentsList,
-    modalFileInput: elements.notesDetailAttachmentInput,
-    modalSaveButton: elements.saveNotesDetailButton,
-    modalDeleteButton: elements.deleteNotesDetailButton,
-    modalCloseButton: elements.closeNotesDetailButton,
     attachmentModal: elements.noteAttachmentModal,
     attachmentModalList: elements.noteAttachmentList,
     attachmentModalFileInput: elements.noteAttachmentFileInput,

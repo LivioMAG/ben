@@ -1129,10 +1129,6 @@ tbody tr:hover {
   display: none;
 }
 
-.notes-detail-modal-card {
-  width: min(760px, calc(100vw - 32px));
-}
-
 .notes-detail-body {
   display: grid;
   gap: 14px;
