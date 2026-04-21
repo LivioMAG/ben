@@ -13,7 +13,7 @@
   const EXPANDED_NOTE_FIXED_WIDTH = 450;
   const EXPANDED_NOTE_WITH_HISTORY_WIDTH = EXPANDED_NOTE_FIXED_WIDTH + 200;
   const EXPANDED_NOTE_BASE_HEIGHT = 300;
-  const EXPANDED_NOTE_CONTENT_HEIGHT = 140;
+  const EXPANDED_NOTE_CONTENT_HEIGHT = 180;
   const EXPANDED_NOTE_TODO_HEIGHT_STEP = 18;
   const EXPANDED_NOTE_PADDING = 12;
   const DEFAULT_NOTE_COLOR = 'yellow';
@@ -773,7 +773,8 @@
           : noteHeight;
         const renderedLeft = isExpanded ? expandedPosition.posX : Number(note.pos_x || 0);
         const renderedTop = isExpanded ? expandedPosition.posY : Number(note.pos_y || 0);
-        const reservedTodoHeight = 110 + (clampedTodoCount * EXPANDED_NOTE_TODO_HEIGHT_STEP);
+        const expandedTodoHeight = clampedTodoCount * EXPANDED_NOTE_TODO_HEIGHT_STEP;
+        const reservedTodoHeight = 110 + expandedTodoHeight;
         const expandedContentHeight = Math.max(72, Math.min(EXPANDED_NOTE_CONTENT_HEIGHT, renderedHeight - reservedTodoHeight));
         const noteColorKey = this.normalizeNoteColor(note.note_color);
         const colorDots = Object.entries(NOTE_COLORS).map(([key, value]) => `
@@ -831,7 +832,7 @@
           <article
             class="dashboard-note ${String(this.activeNoteId) === String(note.id) ? 'active' : ''} ${isExpanded ? 'is-expanded' : ''} ${showHistoryPanel ? 'has-history' : ''} ${isEditing ? 'is-editing' : ''}"
             data-note-id="${this.escapeAttribute(note.id)}"
-            style="left:${renderedLeft}px; top:${renderedTop}px; width:${renderedWidth}px; height:${renderedHeight}px; --dashboard-note-color:${this.escapeAttribute(NOTE_COLORS[noteColorKey])}; --dashboard-expanded-note-content-height:${expandedContentHeight}px;"
+            style="left:${renderedLeft}px; top:${renderedTop}px; width:${renderedWidth}px; height:${renderedHeight}px; --dashboard-note-color:${this.escapeAttribute(NOTE_COLORS[noteColorKey])}; --dashboard-expanded-note-content-height:${expandedContentHeight}px; --dashboard-expanded-note-todo-height:${expandedTodoHeight}px;"
           >
             <div class="dashboard-note-main">
               <div
