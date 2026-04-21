@@ -35,30 +35,42 @@
         </section>
 
         <section class="content-stack">
-          <section class="panel notes-composer-panel">
-            <h2>Neue Notiz</h2>
-            <div id="alert" class="alert hidden"></div>
-            <form id="noteForm" class="form-grid">
-              <label class="full-width">
-                <span>Notiz *</span>
-                <textarea id="noteTextInput" rows="4" required></textarea>
-              </label>
-              <label class="full-width">
-                <span>Anhänge (PDF)</span>
-                <input id="noteAttachmentInput" type="file" accept="application/pdf,.pdf" multiple />
-              </label>
-              <div class="full-width form-actions">
-                <button id="saveNoteButton" class="button button-primary" type="submit">Notiz speichern</button>
-              </div>
-            </form>
-          </section>
-
           <section class="panel">
-            <h2>Notizen</h2>
+            <header class="notes-header">
+              <h2>Notizen</h2>
+              <button id="openNoteModalButton" class="button button-primary icon-button" type="button" aria-label="Neue Notiz">
+                +
+              </button>
+            </header>
+            <div id="alert" class="alert hidden"></div>
             <ul id="notesList" class="notes-list"></ul>
           </section>
         </section>
       </section>
     </main>
+
+    <div id="noteModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="noteModalTitle">
+      <div class="modal-content">
+        <header class="modal-header">
+          <h2 id="noteModalTitle">Neue Notiz</h2>
+          <button id="closeNoteModalButton" class="button button-secondary icon-button" type="button" aria-label="Schließen">
+            ×
+          </button>
+        </header>
+        <form id="noteForm" class="form-grid">
+          <label class="full-width">
+            <span>Notiz *</span>
+            <textarea id="noteTextInput" rows="5" required></textarea>
+          </label>
+          <label class="full-width">
+            <span>Anhänge (PDF)</span>
+            <input id="noteAttachmentInput" type="file" accept="application/pdf,.pdf" multiple />
+          </label>
+          <div class="full-width form-actions">
+            <button id="saveNoteButton" class="button button-primary" type="submit">Notiz speichern</button>
+          </div>
+        </form>
+      </div>
+    </div>
   </body>
 </html>

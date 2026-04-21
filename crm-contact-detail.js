@@ -31,6 +31,9 @@ function cacheElements() {
   elements.notesList = document.getElementById('notesList');
   elements.backButton = document.getElementById('backButton');
   elements.alert = document.getElementById('alert');
+  elements.noteModal = document.getElementById('noteModal');
+  elements.openNoteModalButton = document.getElementById('openNoteModalButton');
+  elements.closeNoteModalButton = document.getElementById('closeNoteModalButton');
 }
 
 function bindEvents() {
@@ -39,6 +42,14 @@ function bindEvents() {
     else window.location.href = './index.html';
   });
   elements.noteForm?.addEventListener('submit', handleSubmitNote);
+  elements.openNoteModalButton?.addEventListener('click', openNoteModal);
+  elements.closeNoteModalButton?.addEventListener('click', closeNoteModal);
+  elements.noteModal?.addEventListener('click', (event) => {
+    if (event.target === elements.noteModal) closeNoteModal();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') closeNoteModal();
+  });
 }
 
 async function initializeSupabase() {
@@ -131,10 +142,20 @@ async function handleSubmitNote(event) {
 
     elements.noteForm.reset();
     showAlert('Notiz gespeichert.', false);
+    closeNoteModal();
     await loadData();
   } catch (error) {
     showAlert(`Notiz konnte nicht gespeichert werden: ${error.message}`, true);
   }
+}
+
+function openNoteModal() {
+  elements.noteModal?.classList.remove('hidden');
+  window.setTimeout(() => elements.noteTextInput?.focus(), 0);
+}
+
+function closeNoteModal() {
+  elements.noteModal?.classList.add('hidden');
 }
 
 function normalizeContactNotes(value) {
