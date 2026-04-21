@@ -1048,11 +1048,15 @@ tbody tr:hover {
 
 .dashboard-note.is-editing {
   cursor: text;
+  touch-action: auto;
 }
 
 .dashboard-note.is-editing .dashboard-note-content {
   overflow: auto;
   max-height: 100%;
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: auto;
 }
 
 .dashboard-note.is-editing .dashboard-note-content:focus {

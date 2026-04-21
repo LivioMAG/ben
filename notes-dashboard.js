@@ -232,8 +232,11 @@
       if (!active) return;
 
       this.activeNoteId = active.id;
+      const isEditingInteraction = this.isEditableInteractionTarget(event.target, active.id);
+      if (isEditingInteraction) {
+        return;
+      }
       if (String(this.expandedNoteId) === String(active.id)) {
-        this.render();
         return;
       }
       this.pressState = {
@@ -250,6 +253,12 @@
       note.setPointerCapture(event.pointerId);
       this.bindDragListeners();
       this.render();
+    }
+
+    isEditableInteractionTarget(target, noteId) {
+      if (!(target instanceof HTMLElement)) return false;
+      if (String(this.editingNoteId) !== String(noteId)) return false;
+      return Boolean(target.closest('.dashboard-note-content'));
     }
 
     handleCanvasClick(event) {
