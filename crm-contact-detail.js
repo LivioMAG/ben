@@ -1,11 +1,7 @@
 const CONFIG_PATH = './supabase-config.json';
-const NOTES_TABLE = 'notes';
-const CRM_NOTE_TYPE = 'crm';
 const CRM_NOTE_STORAGE_BUCKET = 'crm-note-attachments';
-const NOTE_CATEGORY_DEFAULT = 'information';
-const NOTE_RANKING_DEFAULT = 2;
 
-const state = { supabase: null, user: null, contactId: '', contact: null, notes: [], profiles: [] };
+const state = { supabase: null, user: null, contactId: '', contact: null, profiles: [] };
 const elements = {};
 
 document.addEventListener('DOMContentLoaded', init);
@@ -28,10 +24,6 @@ function cacheElements() {
   elements.contactMeta = document.getElementById('contactMeta');
   elements.contactInfo = document.getElementById('contactInfo');
   elements.noteForm = document.getElementById('noteForm');
-  elements.senderUidInput = document.getElementById('senderUidInput');
-  elements.recipientUidInput = document.getElementById('recipientUidInput');
-  elements.noteCategoryInput = document.getElementById('noteCategoryInput');
-  elements.noteRankingInput = document.getElementById('noteRankingInput');
   elements.noteTextInput = document.getElementById('noteTextInput');
   elements.noteAttachmentInput = document.getElementById('noteAttachmentInput');
   elements.notesList = document.getElementById('notesList');
@@ -55,17 +47,14 @@ async function initializeSupabase() {
 }
 
 async function loadData() {
-  const [contactResult, notesResult, profilesResult] = await Promise.all([
+  const [contactResult, profilesResult] = await Promise.all([
     state.supabase.from('crm_contacts').select('*').eq('id', state.contactId).single(),
-    state.supabase.from(NOTES_TABLE).select('*').eq('note_type', CRM_NOTE_TYPE).eq('target_uid', state.contactId).order('created_at', { ascending: false }),
     state.supabase.from('app_profiles').select('id,full_name,email').order('full_name', { ascending: true }),
   ]);
   if (contactResult.error) throw contactResult.error;
-  if (notesResult.error) throw notesResult.error;
   if (profilesResult.error) throw profilesResult.error;
 
   state.contact = contactResult.data;
-  state.notes = notesResult.data || [];
   state.profiles = profilesResult.data || [];
   render();
 }
@@ -82,27 +71,22 @@ function render() {
     ['Adresse', [contact.street, contact.postal_code, contact.city].filter(Boolean).join(', ') || '—'],
   ].map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(value)}</dd>`).join('');
 
-  const options = state.profiles.map((profile) => `<option value="${escapeHtml(profile.id)}">${escapeHtml(profile.full_name || profile.email || profile.id)}</option>`).join('');
-  elements.senderUidInput.innerHTML = options;
-  elements.recipientUidInput.innerHTML = `<option value="">Offen / kein Empfänger</option>${options}`;
-  const defaultSender = state.user?.id || state.profiles[0]?.id || '';
-  if (defaultSender) elements.senderUidInput.value = defaultSender;
-  elements.noteCategoryInput.value = NOTE_CATEGORY_DEFAULT;
-  elements.noteRankingInput.value = String(NOTE_RANKING_DEFAULT);
-
-  if (!state.notes.length) {
+  const notes = normalizeContactNotes(contact.notizen);
+  if (!notes.length) {
     elements.notesList.innerHTML = '<li>Noch keine Notizen vorhanden.</li>';
     return;
   }
-  elements.notesList.innerHTML = state.notes.map((note) => {
+  elements.notesList.innerHTML = notes.slice().reverse().map((note) => {
+    const createdAt = formatDate(note.createdAt || note.created_at);
+    const author = resolveProfileLabel(note.authorUid || note.author_uid);
     const attachments = Array.isArray(note.attachments) ? note.attachments : [];
     const links = attachments.length
       ? `<div>${attachments.map((attachment) => `<a href="${escapeAttribute(attachment.publicUrl || '#')}" target="_blank" rel="noopener">${escapeHtml(attachment.name || 'Anhang')}</a>`).join(' · ')}</div>`
       : '';
     return `<li>
-      <strong>${escapeHtml(new Date(note.created_at).toLocaleString('de-CH'))}</strong>
-      <div>${escapeHtml(note.note_text || '')}</div>
-      <div class="note-meta">Kategorie: ${escapeHtml(note.note_category || 'information')} · Ranking: ${escapeHtml(String(note.note_ranking || 2))} · Sender: ${escapeHtml(note.sender_uid || '—')} · Empfänger: ${escapeHtml(note.recipient_uid || 'offen')}</div>
+      <strong>${escapeHtml(createdAt)}</strong>
+      <div>${escapeHtml(note.text || '')}</div>
+      <div class="note-meta">Autor: ${escapeHtml(author)}</div>
       ${links}
     </li>`;
   }).join('');
@@ -110,28 +94,32 @@ function render() {
 
 async function handleSubmitNote(event) {
   event.preventDefault();
-  const senderUid = String(elements.senderUidInput.value || '').trim();
-  const recipientUid = String(elements.recipientUidInput.value || '').trim();
   const noteText = String(elements.noteTextInput.value || '').trim();
-  const noteCategory = String(elements.noteCategoryInput.value || NOTE_CATEGORY_DEFAULT).trim().toLowerCase();
-  const noteRanking = Math.max(1, Math.min(3, Number(elements.noteRankingInput.value || NOTE_RANKING_DEFAULT)));
-  if (!senderUid || !noteText) {
-    showAlert('Absender und Kommentar sind Pflicht.', true);
+  if (!noteText) {
+    showAlert('Notiztext ist Pflicht.', true);
     return;
   }
 
   try {
-    const attachments = await uploadAttachments(senderUid, state.contactId, elements.noteAttachmentInput.files);
-    const { error } = await state.supabase.from(NOTES_TABLE).insert({
-      target_uid: state.contactId,
-      note_type: CRM_NOTE_TYPE,
-      note_text: noteText,
-      sender_uid: senderUid,
-      recipient_uid: recipientUid || null,
-      note_category: noteCategory || NOTE_CATEGORY_DEFAULT,
-      note_ranking: noteRanking,
-      attachments,
-    });
+    const authorUid = state.user?.id || '';
+    const attachments = await uploadAttachments(authorUid || 'system', state.contactId, elements.noteAttachmentInput.files);
+    const currentNotes = normalizeContactNotes(state.contact?.notizen);
+    const nextNotes = [
+      ...currentNotes,
+      {
+        id: crypto.randomUUID(),
+        text: noteText,
+        authorUid,
+        createdAt: new Date().toISOString(),
+        attachments,
+      },
+    ];
+
+    const { error } = await state.supabase
+      .from('crm_contacts')
+      .update({ notizen: nextNotes })
+      .eq('id', state.contactId);
+
     if (error) throw error;
 
     elements.noteForm.reset();
@@ -140,6 +128,24 @@ async function handleSubmitNote(event) {
   } catch (error) {
     showAlert(`Notiz konnte nicht gespeichert werden: ${error.message}`, true);
   }
+}
+
+function normalizeContactNotes(value) {
+  if (Array.isArray(value)) return value.filter((entry) => entry && typeof entry === 'object');
+  return [];
+}
+
+function resolveProfileLabel(profileId) {
+  if (!profileId) return 'Unbekannt';
+  const profile = state.profiles.find((entry) => String(entry.id) === String(profileId));
+  return profile ? (profile.full_name || profile.email || profile.id) : profileId;
+}
+
+function formatDate(value) {
+  if (!value) return 'Unbekanntes Datum';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString('de-CH');
 }
 
 async function uploadAttachments(senderUid, contactId, fileList) {

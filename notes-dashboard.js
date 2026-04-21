@@ -20,7 +20,7 @@
   const NOTE_COLORS = {
     green: '#dff4df',
     blue: '#dcecff',
-    yellow: '#fff2b8',
+    yellow: '#ffd8b0',
     red: '#ffd7d7',
   };
   const COLOR_STACK_ORDER = {
