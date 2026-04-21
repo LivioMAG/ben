@@ -867,7 +867,10 @@
       const note = this.notes.find((entry) => String(entry.id) === String(noteId));
       if (!note) return;
       await this.saveNoteContent(note.id, note.content || '');
-      this.render();
+      const isCurrentlyEditing = String(this.editingNoteId) === String(noteId);
+      if (!isCurrentlyEditing) {
+        this.render();
+      }
     }
 
     async saveNoteContent(noteId, content) {
