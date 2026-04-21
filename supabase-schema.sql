@@ -202,7 +202,8 @@ create table public.project_kanban_notes (
 create table public.dashboard_notes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.app_profiles(id) on delete cascade,
-  content text not null default '',
+  content jsonb not null default '[]'::jsonb,
+  preview_text text not null default '',
   note_color text not null default 'yellow',
   pos_x integer not null default 0,
   pos_y integer not null default 0,

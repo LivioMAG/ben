@@ -6,11 +6,12 @@
   const GRID_SIZE = 4;
   const DEFAULT_NOTE_WIDTH = 168;
   const DEFAULT_NOTE_HEIGHT = 120;
-  const CARD_PREVIEW_MAX_LENGTH = 80;
+  const CARD_PREVIEW_MAX_LENGTH = 120;
   const LONG_PRESS_DELAY_MS = 520;
   const DRAG_START_THRESHOLD_PX = 6;
   const EXPANDED_NOTE_TODO_MAX_ITEMS = 8;
   const EXPANDED_NOTE_FIXED_WIDTH = 400;
+  const EXPANDED_NOTE_WITH_HISTORY_WIDTH = EXPANDED_NOTE_FIXED_WIDTH + 200;
   const EXPANDED_NOTE_BASE_HEIGHT = 300;
   const EXPANDED_NOTE_CONTENT_HEIGHT = 140;
   const EXPANDED_NOTE_TODO_HEIGHT_STEP = 18;
@@ -47,6 +48,8 @@
       this.editingNoteId = null;
       this.expandedNoteId = null;
       this.inlineSaveTimer = null;
+      this.replySaveTimer = null;
+      this.replyDrafts = new Map();
       this.todoSaveTimers = new Map();
       this.boundResize = this.handleViewportResize.bind(this);
 
@@ -76,11 +79,13 @@
       this.canvas.addEventListener('click', (event) => this.handleCanvasClick(event));
       this.canvas.addEventListener('dblclick', (event) => this.handleNoteDoubleClick(event));
       this.canvas.addEventListener('input', (event) => this.handleInlineEditorInput(event));
+      this.canvas.addEventListener('input', (event) => this.handleReplyInput(event));
       this.canvas.addEventListener('input', (event) => this.handleTodoInput(event));
       this.canvas.addEventListener('change', (event) => this.handleTodoToggle(event));
       this.canvas.addEventListener('keydown', (event) => this.handleTodoKeyDown(event));
       this.canvas.addEventListener('click', (event) => this.handleTodoDeleteClick(event));
       this.canvas.addEventListener('focusout', (event) => this.handleInlineEditorFocusOut(event));
+      this.canvas.addEventListener('focusout', (event) => this.handleReplyFocusOut(event));
       this.canvas.addEventListener('focusout', (event) => this.handleTodoFocusOut(event));
 
       if (this.attachmentModal) {
@@ -101,6 +106,10 @@
       if (this.inlineSaveTimer) {
         window.clearTimeout(this.inlineSaveTimer);
         this.inlineSaveTimer = null;
+      }
+      if (this.replySaveTimer) {
+        window.clearTimeout(this.replySaveTimer);
+        this.replySaveTimer = null;
       }
       this.todoSaveTimers.forEach((timerId) => window.clearTimeout(timerId));
       this.todoSaveTimers.clear();
@@ -144,6 +153,8 @@
 
         this.notes = (notes || []).map((note) => ({
           ...note,
+          conversation: this.normalizeConversation(note.content),
+          preview_text: this.getNormalizedPreviewText(note.preview_text, note.content),
           note_color: this.normalizeNoteColor(note.note_color),
           attachments: (attachments || []).filter((attachment) => String(attachment.note_id) === String(note.id)),
           todos: (todos || []).filter((todo) => String(todo.note_id) === String(note.id)),
@@ -162,6 +173,7 @@
       this.clearPressState();
       this.todoSaveTimers.forEach((timerId) => window.clearTimeout(timerId));
       this.todoSaveTimers.clear();
+      this.replyDrafts.clear();
       this.render();
       this.hideActionBar();
       this.closeAttachmentModal();
@@ -192,7 +204,8 @@
         .from(DASHBOARD_TABLE)
         .insert({
           user_id: userId,
-          content: '',
+          content: [],
+          preview_text: '',
           pos_x: normalized.posX,
           pos_y: normalized.posY,
           width: normalized.width,
@@ -204,7 +217,13 @@
 
       if (error) throw error;
 
-      this.notes.push({ ...data, attachments: [], todos: [] });
+      this.notes.push({
+        ...data,
+        conversation: this.normalizeConversation(data.content),
+        preview_text: this.getNormalizedPreviewText(data.preview_text, data.content),
+        attachments: [],
+        todos: [],
+      });
       this.activeNoteId = data.id;
       this.startInlineEditing(data.id);
     }
@@ -266,7 +285,11 @@
     isEditableInteractionTarget(target, noteId) {
       if (!(target instanceof HTMLElement)) return false;
       if (String(this.editingNoteId) !== String(noteId)) return false;
-      return Boolean(target.closest('.dashboard-note-content') || target.closest('.dashboard-note-todo-list'));
+      return Boolean(
+        target.closest('.dashboard-note-content')
+        || target.closest('.dashboard-note-reply-input')
+        || target.closest('.dashboard-note-todo-list'),
+      );
     }
 
     handleCanvasClick(event) {
@@ -715,10 +738,41 @@
         .map((entry) => entry.note);
 
       this.canvas.innerHTML = notesForRender.map((note) => {
-        const content = String(note.content || '');
+        const conversation = this.normalizeConversation(note.conversation || note.content);
         const isExpanded = String(this.expandedNoteId) === String(note.id);
         const isEditing = String(this.editingNoteId) === String(note.id);
-        const preview = this.getPreviewText(content, isExpanded || isEditing);
+        const canEditLatestUser = this.canEditLatestUserMessage(conversation);
+        const latestEditableText = this.getLatestEditableUserText(conversation);
+        const previewSource = String(note.preview_text || this.getLatestConversationText(conversation));
+        const cardPreview = this.getPreviewText(previewSource);
+        const editorText = isEditing
+          ? (canEditLatestUser ? latestEditableText : cardPreview)
+          : cardPreview;
+        const showHistoryPanel = isExpanded && conversation.length > 1;
+        const historyMarkup = showHistoryPanel ? `
+          <aside class="dashboard-note-history-panel" aria-label="Verlauf">
+            <ul class="dashboard-note-history-list">
+              ${[...conversation].reverse().map((entry) => `
+                <li class="dashboard-note-history-entry role-${this.escapeAttribute(entry.role)}">
+                  <div class="dashboard-note-history-meta">${entry.role === 'ai' ? 'AI' : 'User'} · ${this.formatEntryTimestamp(entry.created_at)}</div>
+                  <div class="dashboard-note-history-text">${this.escapeHtml(entry.text || '')}</div>
+                </li>
+              `).join('')}
+            </ul>
+          </aside>
+        ` : '';
+        const responseInputMarkup = (isExpanded && isEditing && !canEditLatestUser) ? `
+          <label class="dashboard-note-reply-label">
+            <span>Antwort schreiben</span>
+            <textarea
+              class="dashboard-note-reply-input"
+              data-note-reply-input="true"
+              data-note-id="${this.escapeAttribute(note.id)}"
+              rows="4"
+              placeholder="Neue Antwort eingeben ..."
+            >${this.escapeHtml(this.replyDrafts.get(String(note.id)) || '')}</textarea>
+          </label>
+        ` : '';
         const attachmentCount = Array.isArray(note.attachments) ? note.attachments.length : 0;
         const todoItems = Array.isArray(note.todos) ? note.todos : [];
         const todoCount = todoItems.length;
@@ -729,7 +783,7 @@
         const noteHeight = Number(note.height || DEFAULT_NOTE_HEIGHT);
         const canvasWidth = Number(this.canvas?.clientWidth || 0);
         const canvasHeight = Number(this.canvas?.clientHeight || 0);
-        const expandedWidth = this.getExpandedWidth(canvasWidth);
+        const expandedWidth = this.getExpandedWidth(note, canvasWidth);
         const expandedHeight = this.getExpandedHeight(note, canvasHeight);
         const expandedPosition = this.getExpandedPosition(note, expandedWidth, expandedHeight);
         const renderedWidth = isExpanded
@@ -800,7 +854,15 @@
             data-note-id="${this.escapeAttribute(note.id)}"
             style="left:${renderedLeft}px; top:${renderedTop}px; width:${renderedWidth}px; height:${renderedHeight}px; --dashboard-note-color:${this.escapeAttribute(NOTE_COLORS[noteColorKey])}; --dashboard-expanded-note-content-height:${expandedContentHeight}px;"
           >
-            <div class="dashboard-note-content" contenteditable="${isEditing ? 'true' : 'false'}" spellcheck="true">${this.escapeHtml(preview || ' ')}</div>
+            <div class="dashboard-note-main">
+              <div
+                class="dashboard-note-content ${isEditing && !canEditLatestUser ? 'is-readonly' : ''}"
+                contenteditable="${isEditing && canEditLatestUser ? 'true' : 'false'}"
+                spellcheck="${isEditing && canEditLatestUser ? 'true' : 'false'}"
+              >${this.escapeHtml(editorText || ' ')}</div>
+              ${responseInputMarkup}
+            </div>
+            ${historyMarkup}
             ${todoMarkup}
             <footer class="dashboard-note-footer">
               <div class="dashboard-note-footer-left">
@@ -818,9 +880,11 @@
       this.focusInlineEditorIfNeeded();
     }
 
-    getExpandedWidth(canvasWidth = Number(this.canvas?.clientWidth || 0)) {
+    getExpandedWidth(note, canvasWidth = Number(this.canvas?.clientWidth || 0)) {
       const maxExpandedWidth = this.getExpandedMaxWidth(canvasWidth);
-      return Math.max(240, Math.min(EXPANDED_NOTE_FIXED_WIDTH, maxExpandedWidth));
+      const conversation = this.normalizeConversation(note?.conversation || note?.content);
+      const targetWidth = conversation.length > 1 ? EXPANDED_NOTE_WITH_HISTORY_WIDTH : EXPANDED_NOTE_FIXED_WIDTH;
+      return Math.max(240, Math.min(targetWidth, maxExpandedWidth));
     }
 
     getExpandedHeight(note, canvasHeight = Number(this.canvas?.clientHeight || 0)) {
@@ -848,18 +912,79 @@
       return { posX: normalized.posX, posY: normalized.posY };
     }
 
-    getPreviewText(content, showFullText) {
-      if (showFullText || content.length <= CARD_PREVIEW_MAX_LENGTH) {
-        return content;
+    getPreviewText(content) {
+      const normalized = String(content || '').trim();
+      if (normalized.length <= CARD_PREVIEW_MAX_LENGTH) {
+        return normalized;
       }
-      return `${content.slice(0, CARD_PREVIEW_MAX_LENGTH)}...`;
+      return `${normalized.slice(0, CARD_PREVIEW_MAX_LENGTH)}...`;
+    }
+
+    normalizeConversation(rawValue) {
+      if (!Array.isArray(rawValue)) return [];
+      return rawValue
+        .filter((entry) => entry && typeof entry === 'object')
+        .map((entry) => ({
+          role: entry.role === 'ai' ? 'ai' : 'user',
+          text: String(entry.text || ''),
+          created_at: entry.created_at || new Date().toISOString(),
+        }));
+    }
+
+    getLatestConversationText(conversation) {
+      const normalized = this.normalizeConversation(conversation);
+      if (!normalized.length) return '';
+      const latest = normalized[normalized.length - 1];
+      return String(latest.text || '');
+    }
+
+    getNormalizedPreviewText(previewText, conversation) {
+      const normalizedPreview = String(previewText || '').trim();
+      if (normalizedPreview) return normalizedPreview;
+      return this.getLatestConversationText(conversation);
+    }
+
+    canEditLatestUserMessage(conversation) {
+      const normalized = this.normalizeConversation(conversation);
+      if (!normalized.length) return true;
+      const latest = normalized[normalized.length - 1];
+      return latest.role === 'user';
+    }
+
+    getLatestEditableUserText(conversation) {
+      const normalized = this.normalizeConversation(conversation);
+      if (!normalized.length) return '';
+      const latest = normalized[normalized.length - 1];
+      return latest.role === 'user' ? String(latest.text || '') : '';
+    }
+
+    formatEntryTimestamp(value) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleString('de-CH', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
     }
 
     focusInlineEditorIfNeeded() {
       if (!this.canvas || !this.editingNoteId) return;
-      const editor = this.canvas.querySelector(`.dashboard-note[data-note-id="${CSS.escape(String(this.editingNoteId))}"] .dashboard-note-content`);
+      const note = this.notes.find((entry) => String(entry.id) === String(this.editingNoteId));
+      if (!note) return;
+      const conversation = this.normalizeConversation(note.conversation || note.content);
+      const selector = this.canEditLatestUserMessage(conversation)
+        ? '.dashboard-note-content'
+        : '.dashboard-note-reply-input';
+      const editor = this.canvas.querySelector(`.dashboard-note[data-note-id="${CSS.escape(String(this.editingNoteId))}"] ${selector}`);
       if (!(editor instanceof HTMLElement)) return;
       editor.focus();
+      if (editor instanceof HTMLTextAreaElement) {
+        editor.selectionStart = editor.value.length;
+        editor.selectionEnd = editor.value.length;
+        return;
+      }
       const selection = window.getSelection?.();
       if (!selection) return;
       const range = document.createRange();
@@ -896,7 +1021,7 @@
       const noteId = noteElement?.dataset.noteId;
       const note = this.notes.find((entry) => String(entry.id) === String(noteId));
       if (!note) return;
-      note.content = contentEl.textContent || '';
+      note.pendingContentText = contentEl.textContent || '';
       this.scheduleInlineSave(note.id);
     }
 
@@ -929,7 +1054,8 @@
       }
       const note = this.notes.find((entry) => String(entry.id) === String(noteId));
       if (!note) return;
-      await this.saveNoteContent(note.id, note.content || '');
+      await this.saveNoteContent(note.id, note.pendingContentText ?? this.getLatestEditableUserText(note.conversation || note.content));
+      delete note.pendingContentText;
       const isCurrentlyEditing = String(this.editingNoteId) === String(noteId);
       if (!isCurrentlyEditing) {
         this.render();
@@ -940,9 +1066,70 @@
       const supabase = this.getSupabase();
       const note = this.notes.find((entry) => String(entry.id) === String(noteId));
       if (!supabase || !note) return;
-      note.content = String(content || '');
-      const { error } = await supabase.from(DASHBOARD_TABLE).update({ content: note.content }).eq('id', note.id);
+      const text = String(content || '').trim();
+      const conversation = this.normalizeConversation(note.conversation || note.content);
+      if (!conversation.length && !text) return;
+
+      let nextConversation = [...conversation];
+      if (!nextConversation.length && text) {
+        nextConversation.push({ role: 'user', text, created_at: new Date().toISOString() });
+      } else if (this.canEditLatestUserMessage(nextConversation)) {
+        if (!text) return;
+        nextConversation[nextConversation.length - 1] = {
+          ...nextConversation[nextConversation.length - 1],
+          text,
+        };
+      } else if (text) {
+        nextConversation.push({ role: 'user', text, created_at: new Date().toISOString() });
+      }
+
+      const previewText = this.getLatestConversationText(nextConversation);
+      const { error } = await supabase
+        .from(DASHBOARD_TABLE)
+        .update({ content: nextConversation, preview_text: previewText })
+        .eq('id', note.id);
       if (error) throw error;
+      note.conversation = nextConversation;
+      note.content = nextConversation;
+      note.preview_text = previewText;
+    }
+
+    handleReplyInput(event) {
+      const replyInput = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note-reply-input') : null;
+      if (!(replyInput instanceof HTMLTextAreaElement)) return;
+      const noteId = replyInput.getAttribute('data-note-id');
+      if (!noteId) return;
+      this.replyDrafts.set(String(noteId), replyInput.value || '');
+      this.scheduleReplySave(noteId);
+    }
+
+    handleReplyFocusOut(event) {
+      const replyInput = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note-reply-input') : null;
+      if (!(replyInput instanceof HTMLTextAreaElement)) return;
+      const noteId = replyInput.getAttribute('data-note-id');
+      if (!noteId) return;
+      this.persistReplySave(noteId).catch((error) => this.reportError('Antwort konnte nicht gespeichert werden.', error));
+    }
+
+    scheduleReplySave(noteId) {
+      if (this.replySaveTimer) {
+        window.clearTimeout(this.replySaveTimer);
+      }
+      this.replySaveTimer = window.setTimeout(() => {
+        this.persistReplySave(noteId).catch((error) => this.reportError('Antwort konnte nicht gespeichert werden.', error));
+      }, 450);
+    }
+
+    async persistReplySave(noteId) {
+      if (this.replySaveTimer) {
+        window.clearTimeout(this.replySaveTimer);
+        this.replySaveTimer = null;
+      }
+      const draft = String(this.replyDrafts.get(String(noteId)) || '').trim();
+      if (!draft) return;
+      await this.saveNoteContent(noteId, draft);
+      this.replyDrafts.delete(String(noteId));
+      this.render();
     }
 
     getTodoById(todoId) {
