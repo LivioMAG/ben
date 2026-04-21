@@ -1015,9 +1015,9 @@ tbody tr:hover {
 
 .dashboard-note-todo-item {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 6px;
-  align-items: center;
+  align-items: start;
 }
 
 .dashboard-note-todo-checkbox {
@@ -1027,17 +1027,28 @@ tbody tr:hover {
 }
 
 .dashboard-note-todo-input {
-  border: 1px solid rgba(17, 17, 17, 0.12);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.75);
-  padding: 3px 6px;
+  padding: 1px 0;
   font-size: 11px;
   line-height: 1.2;
+  min-height: 14px;
+  outline: none;
+  background: transparent;
+  border: 0;
 }
 
 .dashboard-note-todo-item.is-done .dashboard-note-todo-input {
   text-decoration: line-through;
   color: var(--muted);
+}
+
+.dashboard-note-todo-delete {
+  border: 0;
+  background: transparent;
+  color: rgba(17, 17, 17, 0.62);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px;
 }
 
 .dashboard-note-footer {
@@ -1137,10 +1148,11 @@ tbody tr:hover {
 .dashboard-note.is-expanded {
   z-index: 16;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.26);
+  overflow: auto;
 }
 
 .dashboard-note.is-expanded .dashboard-note-content {
-  max-height: 52%;
+  max-height: none;
 }
 
 .notes-dashboard-action-bar {
