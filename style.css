@@ -1001,8 +1001,8 @@ tbody tr:hover {
 
 .dashboard-note-todo-section {
   display: grid;
-  gap: 6px;
-  margin-top: 2px;
+  gap: 3px;
+  margin-top: 0;
 }
 
 .dashboard-note-todo-list {
@@ -1010,27 +1010,27 @@ tbody tr:hover {
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 4px;
+  gap: 2px;
 }
 
 .dashboard-note-todo-item {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 6px;
+  gap: 4px;
   align-items: start;
 }
 
 .dashboard-note-todo-checkbox {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   margin: 0;
 }
 
 .dashboard-note-todo-input {
-  padding: 1px 0;
+  padding: 0;
   font-size: 11px;
-  line-height: 1.2;
-  min-height: 14px;
+  line-height: 1;
+  min-height: 10px;
   outline: none;
   background: transparent;
   border: 0;
@@ -1048,7 +1048,7 @@ tbody tr:hover {
   cursor: pointer;
   font-size: 11px;
   line-height: 1;
-  padding: 2px;
+  padding: 0;
 }
 
 .dashboard-note-footer {
