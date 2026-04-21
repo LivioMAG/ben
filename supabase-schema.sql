@@ -978,6 +978,7 @@ create table if not exists public.dashboard_notes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.app_profiles(id) on delete cascade,
   content text not null default '',
+  note_color text not null default 'yellow',
   pos_x integer not null default 0,
   pos_y integer not null default 0,
   width integer not null default 320,
@@ -986,6 +987,9 @@ create table if not exists public.dashboard_notes (
   updated_at timestamptz not null default timezone('utc', now()),
   deleted_at timestamptz
 );
+
+alter table public.dashboard_notes
+add column if not exists note_color text not null default 'yellow';
 
 create table if not exists public.dashboard_note_attachments (
   id uuid primary key default gen_random_uuid(),

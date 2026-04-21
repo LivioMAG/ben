@@ -941,6 +941,10 @@ function cacheElements() {
   elements.saveNotesDetailButton = document.getElementById('saveNotesDetailButton');
   elements.deleteNotesDetailButton = document.getElementById('deleteNotesDetailButton');
   elements.closeNotesDetailButton = document.getElementById('closeNotesDetailButton');
+  elements.noteAttachmentModal = document.getElementById('noteAttachmentModal');
+  elements.noteAttachmentList = document.getElementById('noteAttachmentList');
+  elements.noteAttachmentFileInput = document.getElementById('noteAttachmentFileInput');
+  elements.closeNoteAttachmentModalButton = document.getElementById('closeNoteAttachmentModalButton');
 }
 
 function setupNotesDashboard() {
@@ -958,6 +962,10 @@ function setupNotesDashboard() {
     modalSaveButton: elements.saveNotesDetailButton,
     modalDeleteButton: elements.deleteNotesDetailButton,
     modalCloseButton: elements.closeNotesDetailButton,
+    attachmentModal: elements.noteAttachmentModal,
+    attachmentModalList: elements.noteAttachmentList,
+    attachmentModalFileInput: elements.noteAttachmentFileInput,
+    attachmentModalCloseButton: elements.closeNoteAttachmentModalButton,
     getSupabase: () => state.supabase,
     getUserId: () => state.user?.id || null,
     onError: (message, error) => {
