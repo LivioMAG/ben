@@ -563,6 +563,7 @@
     }
 
     normalizeAllPositions() {
+      if (!this.hasRenderableCanvasBounds()) return;
       this.notes = this.notes.map((note) => {
         const normalized = this.normalizePosition({
           posX: Number(note.pos_x || 0),
@@ -582,6 +583,14 @@
 
     normalizePosition({ posX, posY, width, height }) {
       const bounds = this.canvas?.getBoundingClientRect();
+      if (!bounds || bounds.width <= 0 || bounds.height <= 0) {
+        return {
+          posX: this.snapToGrid(posX),
+          posY: this.snapToGrid(posY),
+          width: Math.max(140, Number(width || DEFAULT_NOTE_WIDTH)),
+          height: Math.max(96, Number(height || DEFAULT_NOTE_HEIGHT)),
+        };
+      }
       const maxWidth = Math.max(140, Math.min(width || DEFAULT_NOTE_WIDTH, (bounds?.width || 240) - 12));
       const maxHeight = Math.max(96, Math.min(height || DEFAULT_NOTE_HEIGHT, (bounds?.height || 180) - 12));
       const maxX = Math.max(0, (bounds?.width || maxWidth) - maxWidth - 8);
@@ -598,8 +607,13 @@
       return Math.round(Number(value || 0) / GRID_SIZE) * GRID_SIZE;
     }
 
+    hasRenderableCanvasBounds() {
+      const bounds = this.canvas?.getBoundingClientRect();
+      return Boolean(bounds && bounds.width > 0 && bounds.height > 0);
+    }
+
     handleViewportResize() {
-      if (!this.notes.length) return;
+      if (!this.notes.length || !this.hasRenderableCanvasBounds()) return;
       this.normalizeAllPositions();
       this.render();
       this.persistAllPositions().catch((error) => this.reportError('Positionen konnten nicht aktualisiert werden.', error));
