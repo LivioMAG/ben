@@ -24,13 +24,6 @@
       this.root = this.options.root || null;
       this.canvas = this.options.canvas || null;
       this.actionBar = this.options.actionBar || null;
-      this.modal = this.options.modal || null;
-      this.modalTextarea = this.options.modalTextarea || null;
-      this.modalAttachments = this.options.modalAttachments || null;
-      this.modalFileInput = this.options.modalFileInput || null;
-      this.modalSaveButton = this.options.modalSaveButton || null;
-      this.modalDeleteButton = this.options.modalDeleteButton || null;
-      this.modalCloseButton = this.options.modalCloseButton || null;
       this.attachmentModal = this.options.attachmentModal || null;
       this.attachmentModalList = this.options.attachmentModalList || null;
       this.attachmentModalFileInput = this.options.attachmentModalFileInput || null;
@@ -40,7 +33,6 @@
       this.activeNoteId = null;
       this.dragState = null;
       this.pressState = null;
-      this.isSaving = false;
       this.editingNoteId = null;
       this.expandedNoteId = null;
       this.inlineSaveTimer = null;
@@ -73,22 +65,6 @@
       this.canvas.addEventListener('dblclick', (event) => this.handleNoteDoubleClick(event));
       this.canvas.addEventListener('input', (event) => this.handleInlineEditorInput(event));
       this.canvas.addEventListener('focusout', (event) => this.handleInlineEditorFocusOut(event));
-
-      if (this.modalTextarea) {
-        this.modalTextarea.addEventListener('input', () => this.handleModalInput());
-      }
-      if (this.modalSaveButton) {
-        this.modalSaveButton.addEventListener('click', () => this.saveActiveNoteFromModal());
-      }
-      if (this.modalDeleteButton) {
-        this.modalDeleteButton.addEventListener('click', () => this.deleteActiveNote());
-      }
-      if (this.modalCloseButton) {
-        this.modalCloseButton.addEventListener('click', () => this.closeModal());
-      }
-      if (this.modalFileInput) {
-        this.modalFileInput.addEventListener('change', (event) => this.handleAttachmentUpload(event));
-      }
 
       if (this.attachmentModal) {
         this.attachmentModal.addEventListener('click', (event) => this.handleAttachmentModalClick(event));
@@ -154,7 +130,6 @@
       this.clearPressState();
       this.render();
       this.hideActionBar();
-      this.closeModal();
       this.closeAttachmentModal();
     }
 
@@ -197,8 +172,7 @@
 
       this.notes.push({ ...data, attachments: [] });
       this.activeNoteId = data.id;
-      this.render();
-      this.openModal(data.id);
+      this.startInlineEditing(data.id);
     }
 
     handleCanvasPointerDown(event) {
@@ -293,7 +267,7 @@
       if (!note) return;
       const noteId = note.dataset.noteId;
       if (!noteId) return;
-      this.openModal(noteId);
+      this.startInlineEditing(noteId);
     }
 
     bindDragListeners() {
@@ -454,21 +428,6 @@
       }).eq('id', note.id);
     }
 
-    openModal(noteId) {
-      if (!this.modal) return;
-      this.activeNoteId = noteId;
-      this.modal.classList.remove('hidden');
-      this.renderModal();
-      if (this.modalTextarea) {
-        this.modalTextarea.focus();
-      }
-    }
-
-    closeModal() {
-      if (!this.modal) return;
-      this.modal.classList.add('hidden');
-    }
-
     openAttachmentModal(noteId) {
       if (!this.attachmentModal) return;
       this.activeNoteId = noteId;
@@ -486,29 +445,6 @@
 
     getActiveNote() {
       return this.notes.find((entry) => String(entry.id) === String(this.activeNoteId));
-    }
-
-    renderModal() {
-      const activeNote = this.getActiveNote();
-      if (!activeNote) return;
-      if (this.modalTextarea && this.modalTextarea !== document.activeElement) {
-        this.modalTextarea.value = activeNote.content || '';
-      }
-
-      if (this.modalAttachments) {
-        if (!activeNote.attachments?.length) {
-          this.modalAttachments.innerHTML = '<li class="subtle-text">Keine Anhänge.</li>';
-        } else {
-          this.modalAttachments.innerHTML = activeNote.attachments.map((attachment) => {
-            const url = this.getAttachmentUrl(attachment);
-            const name = this.escapeHtml(attachment.file_name || 'Anhang');
-            if (!url) {
-              return `<li>${name}</li>`;
-            }
-            return `<li><a href="${this.escapeAttribute(url)}" target="_blank" rel="noopener">${name}</a></li>`;
-          }).join('');
-        }
-      }
     }
 
     renderAttachmentModal() {
@@ -545,38 +481,6 @@
       await this.deleteAttachmentById(attachmentId);
       this.renderAttachmentModal();
       this.render();
-    }
-
-    handleModalInput() {
-      const activeNote = this.getActiveNote();
-      if (!activeNote || !this.modalTextarea) return;
-      activeNote.content = String(this.modalTextarea.value || '');
-      this.render();
-    }
-
-    async saveActiveNoteFromModal() {
-      const note = this.getActiveNote();
-      const supabase = this.getSupabase();
-      if (!note || !supabase || this.isSaving) return;
-      this.isSaving = true;
-      try {
-        const content = String(this.modalTextarea?.value || '');
-        await this.saveNoteContent(note.id, content);
-        this.render();
-        this.closeModal();
-      } catch (error) {
-        this.reportError('Notiz konnte nicht gespeichert werden.', error);
-      } finally {
-        this.isSaving = false;
-      }
-    }
-
-    async deleteActiveNote() {
-      const note = this.getActiveNote();
-      if (!note) return;
-      await this.deleteNoteById(note.id);
-      this.closeModal();
-      this.hideActionBar();
     }
 
     async deleteNoteById(noteId) {
@@ -631,14 +535,10 @@
         note.attachments = [...(note.attachments || []), data];
       }
 
-      if (this.modalFileInput) {
-        this.modalFileInput.value = '';
-      }
       if (this.attachmentModalFileInput) {
         this.attachmentModalFileInput.value = '';
       }
       this.render();
-      this.renderModal();
       this.renderAttachmentModal();
     }
 
