@@ -40,6 +40,14 @@ function parseTimeToMinutes(rawInput: string): number | null {
   return hours * 60 + minutes;
 }
 
+function isMissingTimeColumnsError(errorMessage: string | undefined): boolean {
+  if (!errorMessage) return false;
+  const normalized = errorMessage.toLowerCase();
+  return normalized.includes('daily_assignments.start_time does not exist')
+    || normalized.includes('daily_assignments.end_time does not exist')
+    || (normalized.includes('column') && normalized.includes('start_time') && normalized.includes('does not exist'));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Nur POST ist erlaubt.' }), {
@@ -150,19 +158,45 @@ Deno.serve(async (req: Request) => {
     .lte('assignment_date', dateToRaw)
     .order('assignment_date', { ascending: true });
 
-  if (conflictsError) {
+  const usingLegacyDailyAssignmentsSchema = isMissingTimeColumnsError(conflictsError?.message);
+
+  let timeConflicts: Array<{ assignment_date: string; label: string; start_time?: string; end_time?: string }> = [];
+
+  if (usingLegacyDailyAssignmentsSchema) {
+    const { data: legacyConflicts, error: legacyConflictsError } = await supabase
+      .from('daily_assignments')
+      .select('id, assignment_date, label')
+      .eq('profile_id', profileId)
+      .gte('assignment_date', dateFromRaw)
+      .lte('assignment_date', dateToRaw)
+      .order('assignment_date', { ascending: true });
+
+    if (legacyConflictsError) {
+      return new Response(JSON.stringify({ error: legacyConflictsError.message }), {
+        status: 400,
+        headers: jsonHeaders,
+      });
+    }
+
+    timeConflicts = (legacyConflicts || []).map((entry) => ({
+      assignment_date: entry.assignment_date,
+      label: entry.label,
+      start_time: '00:00',
+      end_time: '23:59',
+    }));
+  } else if (conflictsError) {
     return new Response(JSON.stringify({ error: conflictsError.message }), {
       status: 400,
       headers: jsonHeaders,
     });
+  } else {
+    timeConflicts = (conflicts || []).filter((entry) => {
+      const entryStart = parseTimeToMinutes(entry.start_time || '');
+      const entryEnd = parseTimeToMinutes(entry.end_time || '');
+      if (entryStart === null || entryEnd === null) return true;
+      return startTimeMinutes < entryEnd && endTimeMinutes > entryStart;
+    });
   }
-
-  const timeConflicts = (conflicts || []).filter((entry) => {
-    const entryStart = parseTimeToMinutes(entry.start_time || '');
-    const entryEnd = parseTimeToMinutes(entry.end_time || '');
-    if (entryStart === null || entryEnd === null) return true;
-    return startTimeMinutes < entryEnd && endTimeMinutes > entryStart;
-  });
 
   if (timeConflicts.length > 0) {
     return new Response(JSON.stringify({
@@ -183,17 +217,23 @@ Deno.serve(async (req: Request) => {
   const rows = datesToBook.map((assignmentDate) => ({
     profile_id: profileId,
     assignment_date: assignmentDate,
-    start_time: startTimeRaw,
-    end_time: endTimeRaw,
+    ...(usingLegacyDailyAssignmentsSchema ? {} : {
+      start_time: startTimeRaw,
+      end_time: endTimeRaw,
+    }),
     project_id: payload.project_id ?? null,
     label,
     source,
   }));
 
-  const { data: insertedRows, error: insertError } = await supabase
+  const insertBuilder = supabase
     .from('daily_assignments')
-    .insert(rows)
-    .select('id, profile_id, assignment_date, start_time, end_time, project_id, label, source');
+    .insert(rows);
+
+  const { data: insertedRows, error: insertError } = await insertBuilder
+    .select(usingLegacyDailyAssignmentsSchema
+      ? 'id, profile_id, assignment_date, project_id, label, source'
+      : 'id, profile_id, assignment_date, start_time, end_time, project_id, label, source');
 
   if (insertError) {
     return new Response(JSON.stringify({ error: insertError.message }), {
