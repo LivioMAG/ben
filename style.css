@@ -1217,12 +1217,20 @@ tbody tr:hover {
   z-index: 16;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.26);
   overflow: hidden;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "main"
+    "todo"
+    "footer";
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.dashboard-note.is-expanded.has-history {
   grid-template-columns: minmax(0, 1fr) 200px;
   grid-template-areas:
     "main history"
     "todo history"
     "footer history";
-  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
 .dashboard-note.is-expanded .dashboard-note-main {
