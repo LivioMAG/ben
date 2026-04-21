@@ -995,8 +995,51 @@ tbody tr:hover {
   word-break: break-word;
   line-height: 1.2;
   font-size: 12px;
-  max-height: calc(1.2em * 5);
+  max-height: calc(1.2em * 6);
   overflow: hidden;
+}
+
+.dashboard-note-todo-section {
+  display: grid;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.dashboard-note-todo-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  max-height: 42%;
+  overflow: auto;
+}
+
+.dashboard-note-todo-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+
+.dashboard-note-todo-checkbox {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.dashboard-note-todo-input {
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.75);
+  padding: 3px 6px;
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.dashboard-note-todo-item.is-done .dashboard-note-todo-input {
+  text-decoration: line-through;
+  color: var(--muted);
 }
 
 .dashboard-note-footer {
@@ -1069,7 +1112,7 @@ tbody tr:hover {
 }
 
 .dashboard-note.is-expanded .dashboard-note-content {
-  max-height: 100%;
+  max-height: 52%;
 }
 
 .notes-dashboard-action-bar {

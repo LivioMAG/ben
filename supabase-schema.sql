@@ -226,6 +226,18 @@ create table public.dashboard_note_attachments (
   deleted_at timestamptz
 );
 
+create table public.dashboard_note_todos (
+  id uuid primary key default gen_random_uuid(),
+  note_id uuid not null references public.dashboard_notes(id) on delete cascade,
+  user_id uuid not null references public.app_profiles(id) on delete cascade,
+  content text not null default '',
+  is_done boolean not null default false,
+  position integer not null default 0,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  deleted_at timestamptz
+);
+
 create or replace function public.is_admin_user()
 returns boolean
 language sql
@@ -480,6 +492,7 @@ create index notes_target_uid_created_at_idx on public.notes (target_uid, create
 create index project_kanban_notes_project_status_idx on public.project_kanban_notes (project_id, status, position);
 create index dashboard_notes_user_id_idx on public.dashboard_notes (user_id);
 create index dashboard_note_attachments_note_id_idx on public.dashboard_note_attachments (note_id);
+create index dashboard_note_todos_note_position_idx on public.dashboard_note_todos (note_id, position);
 
 create trigger set_updated_at_app_profiles
 before update on public.app_profiles
@@ -525,6 +538,10 @@ create trigger set_updated_at_dashboard_note_attachments
 before update on public.dashboard_note_attachments
 for each row execute function public.set_updated_at();
 
+create trigger set_updated_at_dashboard_note_todos
+before update on public.dashboard_note_todos
+for each row execute function public.set_updated_at();
+
 alter table public.app_profiles enable row level security;
 alter table public.crm_contacts enable row level security;
 alter table public.properties enable row level security;
@@ -540,6 +557,7 @@ alter table public.notes enable row level security;
 alter table public.project_kanban_notes enable row level security;
 alter table public.dashboard_notes enable row level security;
 alter table public.dashboard_note_attachments enable row level security;
+alter table public.dashboard_note_todos enable row level security;
 
 create policy "app_profiles select own or admin"
 on public.app_profiles
@@ -735,6 +753,19 @@ using (public.is_admin_user() or auth.uid() = user_id);
 
 create policy "dashboard attachments write own or admin"
 on public.dashboard_note_attachments
+for all
+to authenticated
+using (public.is_admin_user() or auth.uid() = user_id)
+with check (public.is_admin_user() or auth.uid() = user_id);
+
+create policy "dashboard todos read own or admin"
+on public.dashboard_note_todos
+for select
+to authenticated
+using (public.is_admin_user() or auth.uid() = user_id);
+
+create policy "dashboard todos write own or admin"
+on public.dashboard_note_todos
 for all
 to authenticated
 using (public.is_admin_user() or auth.uid() = user_id)
