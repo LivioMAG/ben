@@ -10,7 +10,7 @@
   const LONG_PRESS_DELAY_MS = 520;
   const DRAG_START_THRESHOLD_PX = 6;
   const EXPANDED_NOTE_TODO_MAX_ITEMS = 8;
-  const EXPANDED_NOTE_FIXED_WIDTH = 400;
+  const EXPANDED_NOTE_FIXED_WIDTH = 450;
   const EXPANDED_NOTE_WITH_HISTORY_WIDTH = EXPANDED_NOTE_FIXED_WIDTH + 200;
   const EXPANDED_NOTE_BASE_HEIGHT = 300;
   const EXPANDED_NOTE_CONTENT_HEIGHT = 140;
@@ -48,8 +48,6 @@
       this.editingNoteId = null;
       this.expandedNoteId = null;
       this.inlineSaveTimer = null;
-      this.replySaveTimer = null;
-      this.replyDrafts = new Map();
       this.todoSaveTimers = new Map();
       this.boundResize = this.handleViewportResize.bind(this);
 
@@ -79,13 +77,11 @@
       this.canvas.addEventListener('click', (event) => this.handleCanvasClick(event));
       this.canvas.addEventListener('dblclick', (event) => this.handleNoteDoubleClick(event));
       this.canvas.addEventListener('input', (event) => this.handleInlineEditorInput(event));
-      this.canvas.addEventListener('input', (event) => this.handleReplyInput(event));
       this.canvas.addEventListener('input', (event) => this.handleTodoInput(event));
       this.canvas.addEventListener('change', (event) => this.handleTodoToggle(event));
       this.canvas.addEventListener('keydown', (event) => this.handleTodoKeyDown(event));
       this.canvas.addEventListener('click', (event) => this.handleTodoDeleteClick(event));
       this.canvas.addEventListener('focusout', (event) => this.handleInlineEditorFocusOut(event));
-      this.canvas.addEventListener('focusout', (event) => this.handleReplyFocusOut(event));
       this.canvas.addEventListener('focusout', (event) => this.handleTodoFocusOut(event));
 
       if (this.attachmentModal) {
@@ -106,10 +102,6 @@
       if (this.inlineSaveTimer) {
         window.clearTimeout(this.inlineSaveTimer);
         this.inlineSaveTimer = null;
-      }
-      if (this.replySaveTimer) {
-        window.clearTimeout(this.replySaveTimer);
-        this.replySaveTimer = null;
       }
       this.todoSaveTimers.forEach((timerId) => window.clearTimeout(timerId));
       this.todoSaveTimers.clear();
@@ -173,7 +165,6 @@
       this.clearPressState();
       this.todoSaveTimers.forEach((timerId) => window.clearTimeout(timerId));
       this.todoSaveTimers.clear();
-      this.replyDrafts.clear();
       this.render();
       this.hideActionBar();
       this.closeAttachmentModal();
@@ -761,18 +752,6 @@
             </ul>
           </aside>
         ` : '';
-        const responseInputMarkup = (isExpanded && isEditing && !canEditLatestUser) ? `
-          <label class="dashboard-note-reply-label">
-            <span>Antwort schreiben</span>
-            <textarea
-              class="dashboard-note-reply-input"
-              data-note-reply-input="true"
-              data-note-id="${this.escapeAttribute(note.id)}"
-              rows="4"
-              placeholder="Neue Antwort eingeben ..."
-            >${this.escapeHtml(this.replyDrafts.get(String(note.id)) || '')}</textarea>
-          </label>
-        ` : '';
         const attachmentCount = Array.isArray(note.attachments) ? note.attachments.length : 0;
         const todoItems = Array.isArray(note.todos) ? note.todos : [];
         const todoCount = todoItems.length;
@@ -856,11 +835,10 @@
           >
             <div class="dashboard-note-main">
               <div
-                class="dashboard-note-content ${isEditing && !canEditLatestUser ? 'is-readonly' : ''}"
-                contenteditable="${isEditing && canEditLatestUser ? 'true' : 'false'}"
-                spellcheck="${isEditing && canEditLatestUser ? 'true' : 'false'}"
+                class="dashboard-note-content"
+                contenteditable="${isEditing ? 'true' : 'false'}"
+                spellcheck="${isEditing ? 'true' : 'false'}"
               >${this.escapeHtml(editorText || ' ')}</div>
-              ${responseInputMarkup}
             </div>
             ${historyMarkup}
             ${todoMarkup}
@@ -996,17 +974,9 @@
       const note = this.notes.find((entry) => String(entry.id) === String(this.editingNoteId));
       if (!note) return;
       const conversation = this.normalizeConversation(note.conversation || note.content);
-      const selector = this.canEditLatestUserMessage(conversation)
-        ? '.dashboard-note-content'
-        : '.dashboard-note-reply-input';
-      const editor = this.canvas.querySelector(`.dashboard-note[data-note-id="${CSS.escape(String(this.editingNoteId))}"] ${selector}`);
+      const editor = this.canvas.querySelector(`.dashboard-note[data-note-id="${CSS.escape(String(this.editingNoteId))}"] .dashboard-note-content`);
       if (!(editor instanceof HTMLElement)) return;
       editor.focus();
-      if (editor instanceof HTMLTextAreaElement) {
-        editor.selectionStart = editor.value.length;
-        editor.selectionEnd = editor.value.length;
-        return;
-      }
       const selection = window.getSelection?.();
       if (!selection) return;
       const range = document.createRange();
@@ -1114,44 +1084,6 @@
       note.conversation = nextConversation;
       note.content = nextConversation;
       note.preview_text = previewText;
-    }
-
-    handleReplyInput(event) {
-      const replyInput = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note-reply-input') : null;
-      if (!(replyInput instanceof HTMLTextAreaElement)) return;
-      const noteId = replyInput.getAttribute('data-note-id');
-      if (!noteId) return;
-      this.replyDrafts.set(String(noteId), replyInput.value || '');
-      this.scheduleReplySave(noteId);
-    }
-
-    handleReplyFocusOut(event) {
-      const replyInput = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note-reply-input') : null;
-      if (!(replyInput instanceof HTMLTextAreaElement)) return;
-      const noteId = replyInput.getAttribute('data-note-id');
-      if (!noteId) return;
-      this.persistReplySave(noteId).catch((error) => this.reportError('Antwort konnte nicht gespeichert werden.', error));
-    }
-
-    scheduleReplySave(noteId) {
-      if (this.replySaveTimer) {
-        window.clearTimeout(this.replySaveTimer);
-      }
-      this.replySaveTimer = window.setTimeout(() => {
-        this.persistReplySave(noteId).catch((error) => this.reportError('Antwort konnte nicht gespeichert werden.', error));
-      }, 450);
-    }
-
-    async persistReplySave(noteId) {
-      if (this.replySaveTimer) {
-        window.clearTimeout(this.replySaveTimer);
-        this.replySaveTimer = null;
-      }
-      const draft = String(this.replyDrafts.get(String(noteId)) || '').trim();
-      if (!draft) return;
-      await this.saveNoteContent(noteId, draft);
-      this.replyDrafts.delete(String(noteId));
-      this.render();
     }
 
     getTodoById(todoId) {
