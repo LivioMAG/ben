@@ -9,12 +9,11 @@
   const CARD_PREVIEW_MAX_LENGTH = 80;
   const LONG_PRESS_DELAY_MS = 520;
   const DRAG_START_THRESHOLD_PX = 6;
-  const EXPANDED_NOTE_TODO_MAX_ITEMS = 10;
-  const EXPANDED_NOTE_TODO_BASE_EXTRA_HEIGHT = 12;
-  const EXPANDED_NOTE_TODO_ITEM_EXTRA_HEIGHT = 30;
-  const EXPANDED_NOTE_SIZE_STEP = 28;
+  const EXPANDED_NOTE_TODO_MAX_ITEMS = 8;
+  const EXPANDED_NOTE_FIXED_WIDTH = 500;
+  const EXPANDED_NOTE_FIXED_HEIGHT = 300;
+  const EXPANDED_NOTE_CONTENT_HEIGHT = 200;
   const EXPANDED_NOTE_PADDING = 12;
-  const EXPANDED_NOTE_MEASURE_GUARD = 60;
   const DEFAULT_NOTE_COLOR = 'yellow';
   const NOTE_COLORS = {
     green: '#dff4df',
@@ -694,6 +693,7 @@
 
     render() {
       if (!this.canvas) return;
+      this.applyExpandedLayoutVariables();
       if (!this.notes.length) {
         this.canvas.innerHTML = '<div class="dashboard-note-empty subtle-text">Doppelklick zum Erstellen einer Notiz.</div>';
         return;
@@ -728,14 +728,17 @@
         const noteHeight = Number(note.height || DEFAULT_NOTE_HEIGHT);
         const canvasWidth = Number(this.canvas?.clientWidth || 0);
         const canvasHeight = Number(this.canvas?.clientHeight || 0);
+        const expandedWidth = this.getExpandedWidth(canvasWidth);
+        const expandedHeight = this.getExpandedHeight(canvasHeight);
+        const expandedPosition = this.getExpandedPosition(note, expandedWidth, expandedHeight);
         const renderedWidth = isExpanded
-          ? this.getExpandedInitialWidth(noteWidth, canvasWidth)
+          ? expandedWidth
           : noteWidth;
         const renderedHeight = isExpanded
-          ? this.getExpandedInitialHeight(noteHeight + this.getExpandedTodoExtraHeight(clampedTodoCount), canvasHeight)
+          ? expandedHeight
           : noteHeight;
-        const renderedLeft = isExpanded ? EXPANDED_NOTE_PADDING : Number(note.pos_x || 0);
-        const renderedTop = isExpanded ? EXPANDED_NOTE_PADDING : Number(note.pos_y || 0);
+        const renderedLeft = isExpanded ? expandedPosition.posX : Number(note.pos_x || 0);
+        const renderedTop = isExpanded ? expandedPosition.posY : Number(note.pos_y || 0);
         const noteColorKey = this.normalizeNoteColor(note.note_color);
         const colorDots = Object.entries(NOTE_COLORS).map(([key, value]) => `
           <button
@@ -809,18 +812,17 @@
           </article>
         `;
       }).join('');
-      this.adjustExpandedNoteSize();
       this.focusInlineEditorIfNeeded();
     }
 
-    getExpandedInitialWidth(noteWidth, canvasWidth) {
+    getExpandedWidth(canvasWidth = Number(this.canvas?.clientWidth || 0)) {
       const maxExpandedWidth = this.getExpandedMaxWidth(canvasWidth);
-      return Math.max(240, Math.min(Math.max(140, noteWidth), maxExpandedWidth));
+      return Math.max(240, Math.min(EXPANDED_NOTE_FIXED_WIDTH, maxExpandedWidth));
     }
 
-    getExpandedInitialHeight(noteHeight, canvasHeight) {
+    getExpandedHeight(canvasHeight = Number(this.canvas?.clientHeight || 0)) {
       const maxExpandedHeight = this.getExpandedMaxHeight(canvasHeight);
-      return Math.max(140, Math.min(Math.max(96, noteHeight), maxExpandedHeight));
+      return Math.max(140, Math.min(EXPANDED_NOTE_FIXED_HEIGHT, maxExpandedHeight));
     }
 
     getExpandedMaxWidth(canvasWidth = Number(this.canvas?.clientWidth || 0)) {
@@ -831,31 +833,14 @@
       return Math.max(140, canvasHeight - (EXPANDED_NOTE_PADDING * 2));
     }
 
-    adjustExpandedNoteSize() {
-      if (!this.canvas || !this.expandedNoteId) return;
-      const selector = `.dashboard-note[data-note-id="${CSS.escape(String(this.expandedNoteId))}"]`;
-      const noteElement = this.canvas.querySelector(selector);
-      if (!(noteElement instanceof HTMLElement)) return;
-
-      let width = Number(noteElement.offsetWidth || 0);
-      let height = Number(noteElement.offsetHeight || 0);
-      const maxWidth = this.getExpandedMaxWidth();
-      const maxHeight = this.getExpandedMaxHeight();
-
-      for (let guard = 0; guard < EXPANDED_NOTE_MEASURE_GUARD; guard += 1) {
-        const overflowsX = noteElement.scrollWidth > noteElement.clientWidth + 1;
-        const overflowsY = noteElement.scrollHeight > noteElement.clientHeight + 1;
-        if (!overflowsX && !overflowsY) break;
-
-        const nextWidth = overflowsX ? Math.min(maxWidth, width + EXPANDED_NOTE_SIZE_STEP) : width;
-        const nextHeight = overflowsY ? Math.min(maxHeight, height + EXPANDED_NOTE_SIZE_STEP) : height;
-        if (nextWidth === width && nextHeight === height) break;
-
-        width = nextWidth;
-        height = nextHeight;
-        noteElement.style.width = `${width}px`;
-        noteElement.style.height = `${height}px`;
-      }
+    getExpandedPosition(note, expandedWidth, expandedHeight) {
+      const normalized = this.normalizePosition({
+        posX: Number(note?.pos_x || 0),
+        posY: Number(note?.pos_y || 0),
+        width: expandedWidth,
+        height: expandedHeight,
+      });
+      return { posX: normalized.posX, posY: normalized.posY };
     }
 
     getPreviewText(content, showFullText) {
@@ -863,11 +848,6 @@
         return content;
       }
       return `${content.slice(0, CARD_PREVIEW_MAX_LENGTH)}...`;
-    }
-
-    getExpandedTodoExtraHeight(todoCount) {
-      if (!todoCount) return 0;
-      return EXPANDED_NOTE_TODO_BASE_EXTRA_HEIGHT + (todoCount * EXPANDED_NOTE_TODO_ITEM_EXTRA_HEIGHT);
     }
 
     focusInlineEditorIfNeeded() {
@@ -899,6 +879,13 @@
       this.render();
     }
 
+    applyExpandedLayoutVariables() {
+      if (!this.canvas) return;
+      const expandedHeight = this.getExpandedHeight(Number(this.canvas?.clientHeight || 0));
+      const contentHeight = Math.min(EXPANDED_NOTE_CONTENT_HEIGHT, Math.max(80, expandedHeight - 100));
+      this.canvas.style.setProperty('--dashboard-expanded-note-content-height', `${contentHeight}px`);
+    }
+
     handleInlineEditorInput(event) {
       const contentEl = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note-content') : null;
       if (!contentEl) return;
@@ -907,7 +894,6 @@
       const note = this.notes.find((entry) => String(entry.id) === String(noteId));
       if (!note) return;
       note.content = contentEl.textContent || '';
-      this.adjustExpandedNoteSize();
       this.scheduleInlineSave(note.id);
     }
 
@@ -1015,7 +1001,6 @@
       const pair = this.getTodoById(todoId);
       if (!pair) return;
       pair.todo.content = input.textContent || '';
-      this.adjustExpandedNoteSize();
       this.scheduleTodoSave(todoId);
     }
 
