@@ -7,8 +7,9 @@
   const DEFAULT_NOTE_HEIGHT = 120;
   const CARD_PREVIEW_MAX_LENGTH = 80;
   const LONG_PRESS_DELAY_MS = 520;
-  const LONG_HOVER_DELAY_MS = 3000;
   const DRAG_START_THRESHOLD_PX = 6;
+  const EXPANDED_NOTE_WIDTH_MULTIPLIER = 2;
+  const EXPANDED_NOTE_HEIGHT_MULTIPLIER = 2;
 
   class NotesDashboard {
     constructor(options) {
@@ -30,7 +31,6 @@
       this.pressState = null;
       this.isSaving = false;
       this.editingNoteId = null;
-      this.hoverState = null;
       this.expandedNoteId = null;
       this.inlineSaveTimer = null;
       this.boundResize = this.handleViewportResize.bind(this);
@@ -59,8 +59,6 @@
       this.canvas.addEventListener('dblclick', (event) => this.handleCanvasDoubleClick(event));
       this.canvas.addEventListener('pointerdown', (event) => this.handleCanvasPointerDown(event));
       this.canvas.addEventListener('dblclick', (event) => this.handleNoteDoubleClick(event));
-      this.canvas.addEventListener('pointerover', (event) => this.handleCanvasPointerOver(event));
-      this.canvas.addEventListener('pointerout', (event) => this.handleCanvasPointerOut(event));
       this.canvas.addEventListener('input', (event) => this.handleInlineEditorInput(event));
       this.canvas.addEventListener('focusout', (event) => this.handleInlineEditorFocusOut(event));
 
@@ -85,7 +83,6 @@
     destroy() {
       window.removeEventListener('resize', this.boundResize);
       this.clearPressState();
-      this.clearHoverState();
       if (this.inlineSaveTimer) {
         window.clearTimeout(this.inlineSaveTimer);
         this.inlineSaveTimer = null;
@@ -132,7 +129,6 @@
       this.activeNoteId = null;
       this.dragState = null;
       this.clearPressState();
-      this.clearHoverState();
       this.render();
       this.hideActionBar();
       this.closeModal();
@@ -200,6 +196,7 @@
         startClientY: event.clientY,
         clientX: event.clientX,
         clientY: event.clientY,
+        didDrag: false,
       };
       this.pressState.timerId = window.setTimeout(() => this.handleLongPress(event.pointerId), LONG_PRESS_DELAY_MS);
       note.setPointerCapture(event.pointerId);
@@ -262,6 +259,7 @@
       ) >= DRAG_START_THRESHOLD_PX;
       if (!movedEnough) return;
       this.clearPressTimer();
+      this.pressState.didDrag = true;
       this.startDraggingNote(note, this.pressState.noteElement, event);
       this.showActionBar();
       this.handleNotePointerMove(event);
@@ -297,9 +295,10 @@
         noteElement.releasePointerCapture(pointerId);
       }
       const longPressTriggered = Boolean(this.pressState.longPressTriggered);
+      const didDrag = Boolean(this.pressState.didDrag);
       this.clearPressState();
       this.unbindDragListeners();
-      if (!longPressTriggered) {
+      if (!longPressTriggered && !didDrag) {
         this.startInlineEditing(noteId);
       }
     }
@@ -319,7 +318,6 @@
     handleLongPress(pointerId) {
       if (!this.pressState || this.pressState.pointerId !== pointerId) return;
       this.pressState.longPressTriggered = true;
-      this.showActionBar();
     }
 
     clearPressTimer() {
@@ -385,44 +383,6 @@
     closeModal() {
       if (!this.modal) return;
       this.modal.classList.add('hidden');
-    }
-
-    handleCanvasPointerOver(event) {
-      const note = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note') : null;
-      if (!note || event.pointerType === 'touch') return;
-      const related = event.relatedTarget instanceof HTMLElement ? event.relatedTarget.closest('.dashboard-note') : null;
-      if (related && related.dataset.noteId === note.dataset.noteId) return;
-      const noteId = note.dataset.noteId;
-      if (!noteId) return;
-      this.clearHoverState();
-      this.hoverState = { noteId };
-      this.hoverState.timerId = window.setTimeout(() => {
-        if (!this.hoverState || String(this.hoverState.noteId) !== String(noteId)) return;
-        this.expandedNoteId = noteId;
-        this.render();
-      }, LONG_HOVER_DELAY_MS);
-    }
-
-    handleCanvasPointerOut(event) {
-      const sourceNote = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note') : null;
-      if (!sourceNote) return;
-      const related = event.relatedTarget instanceof HTMLElement ? event.relatedTarget.closest('.dashboard-note') : null;
-      if (related && related.dataset.noteId === sourceNote.dataset.noteId) return;
-      const noteId = sourceNote.dataset.noteId;
-      if (this.hoverState && String(this.hoverState.noteId) === String(noteId)) {
-        this.clearHoverState();
-      }
-      if (String(this.expandedNoteId) === String(noteId)) {
-        this.expandedNoteId = null;
-        this.render();
-      }
-    }
-
-    clearHoverState() {
-      if (this.hoverState?.timerId) {
-        window.clearTimeout(this.hoverState.timerId);
-      }
-      this.hoverState = null;
     }
 
     getActiveNote() {
@@ -611,6 +571,7 @@
       }
       this.activeNoteId = null;
       this.editingNoteId = null;
+      this.expandedNoteId = null;
       this.hideActionBar();
       this.render();
     }
@@ -639,11 +600,15 @@
         const isEditing = String(this.editingNoteId) === String(note.id);
         const preview = this.getPreviewText(content, isExpanded || isEditing);
         const attachmentCount = Array.isArray(note.attachments) ? note.attachments.length : 0;
+        const noteWidth = Number(note.width || DEFAULT_NOTE_WIDTH);
+        const noteHeight = Number(note.height || DEFAULT_NOTE_HEIGHT);
+        const renderedWidth = isExpanded ? noteWidth * EXPANDED_NOTE_WIDTH_MULTIPLIER : noteWidth;
+        const renderedHeight = isExpanded ? noteHeight * EXPANDED_NOTE_HEIGHT_MULTIPLIER : noteHeight;
         return `
           <article
             class="dashboard-note ${String(this.activeNoteId) === String(note.id) ? 'active' : ''} ${isExpanded ? 'is-expanded' : ''} ${isEditing ? 'is-editing' : ''}"
             data-note-id="${this.escapeAttribute(note.id)}"
-            style="left:${Number(note.pos_x || 0)}px; top:${Number(note.pos_y || 0)}px; width:${Number(note.width || DEFAULT_NOTE_WIDTH)}px; height:${Number(note.height || DEFAULT_NOTE_HEIGHT)}px;"
+            style="left:${Number(note.pos_x || 0)}px; top:${Number(note.pos_y || 0)}px; width:${renderedWidth}px; height:${renderedHeight}px;"
           >
             <div class="dashboard-note-content" contenteditable="${isEditing ? 'true' : 'false'}" spellcheck="true">${this.escapeHtml(preview || ' ')}</div>
             <footer class="dashboard-note-footer">
@@ -679,6 +644,7 @@
 
     startInlineEditing(noteId) {
       this.activeNoteId = noteId;
+      this.expandedNoteId = noteId;
       this.editingNoteId = noteId;
       this.hideActionBar();
       this.render();

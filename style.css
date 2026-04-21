@@ -982,8 +982,7 @@ tbody tr:hover {
   overflow: hidden;
   touch-action: none;
   cursor: pointer;
-  transition: transform 0.28s ease, box-shadow 0.28s ease;
-  transform-origin: center;
+  transition: box-shadow 0.28s ease;
 }
 
 .dashboard-note.active {
@@ -1023,7 +1022,6 @@ tbody tr:hover {
 }
 
 .dashboard-note.is-expanded {
-  transform: scale(1.75);
   z-index: 16;
   box-shadow: 0 16px 34px rgba(0, 0, 0, 0.26);
 }
