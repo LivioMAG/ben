@@ -12,7 +12,7 @@
   const EXPANDED_NOTE_TODO_MAX_ITEMS = 8;
   const EXPANDED_NOTE_FIXED_WIDTH = 400;
   const EXPANDED_NOTE_BASE_HEIGHT = 300;
-  const EXPANDED_NOTE_CONTENT_HEIGHT = 200;
+  const EXPANDED_NOTE_CONTENT_HEIGHT = 140;
   const EXPANDED_NOTE_TODO_HEIGHT_STEP = 30;
   const EXPANDED_NOTE_PADDING = 12;
   const DEFAULT_NOTE_COLOR = 'yellow';
@@ -740,7 +740,8 @@
           : noteHeight;
         const renderedLeft = isExpanded ? expandedPosition.posX : Number(note.pos_x || 0);
         const renderedTop = isExpanded ? expandedPosition.posY : Number(note.pos_y || 0);
-        const expandedContentHeight = Math.min(EXPANDED_NOTE_CONTENT_HEIGHT + (clampedTodoCount * EXPANDED_NOTE_TODO_HEIGHT_STEP), Math.max(80, renderedHeight - 100));
+        const reservedTodoHeight = 110 + (clampedTodoCount * EXPANDED_NOTE_TODO_HEIGHT_STEP);
+        const expandedContentHeight = Math.max(72, Math.min(EXPANDED_NOTE_CONTENT_HEIGHT, renderedHeight - reservedTodoHeight));
         const noteColorKey = this.normalizeNoteColor(note.note_color);
         const colorDots = Object.entries(NOTE_COLORS).map(([key, value]) => `
           <button
