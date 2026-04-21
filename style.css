@@ -975,7 +975,7 @@ tbody tr:hover {
   padding: 8px;
   border-radius: 10px;
   border: 1px solid rgba(17, 17, 17, 0.1);
-  background: #fff6a8;
+  background: var(--dashboard-note-color, #fff2b8);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.13);
   display: grid;
   gap: 4px;
@@ -1006,6 +1006,44 @@ tbody tr:hover {
   gap: 10px;
   font-size: 10px;
   color: var(--muted);
+  align-items: center;
+}
+
+.dashboard-note-footer-left,
+.dashboard-note-footer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dashboard-note-icon-button {
+  border: 1px solid rgba(17, 17, 17, 0.15);
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.dashboard-note-colors {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dashboard-note-color-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(17, 17, 17, 0.2);
+  background: var(--note-color-dot, #fff2b8);
+  cursor: pointer;
+  padding: 0;
+}
+
+.dashboard-note-color-dot.is-selected {
+  box-shadow: 0 0 0 2px rgba(17, 17, 17, 0.2);
 }
 
 .dashboard-note.is-editing {
@@ -1101,6 +1139,13 @@ tbody tr:hover {
   padding-left: 18px;
   display: grid;
   gap: 6px;
+}
+
+.dashboard-note-attachment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .adjusted-time-button {

@@ -10,6 +10,13 @@
   const DRAG_START_THRESHOLD_PX = 6;
   const EXPANDED_NOTE_WIDTH_MULTIPLIER = 2;
   const EXPANDED_NOTE_HEIGHT_MULTIPLIER = 2;
+  const DEFAULT_NOTE_COLOR = 'yellow';
+  const NOTE_COLORS = {
+    yellow: '#fff2b8',
+    blue: '#dcecff',
+    green: '#dff4df',
+    pink: '#ffe0ec',
+  };
 
   class NotesDashboard {
     constructor(options) {
@@ -24,6 +31,10 @@
       this.modalSaveButton = this.options.modalSaveButton || null;
       this.modalDeleteButton = this.options.modalDeleteButton || null;
       this.modalCloseButton = this.options.modalCloseButton || null;
+      this.attachmentModal = this.options.attachmentModal || null;
+      this.attachmentModalList = this.options.attachmentModalList || null;
+      this.attachmentModalFileInput = this.options.attachmentModalFileInput || null;
+      this.attachmentModalCloseButton = this.options.attachmentModalCloseButton || null;
 
       this.notes = [];
       this.activeNoteId = null;
@@ -58,6 +69,7 @@
       if (!this.root || !this.canvas) return;
       this.canvas.addEventListener('dblclick', (event) => this.handleCanvasDoubleClick(event));
       this.canvas.addEventListener('pointerdown', (event) => this.handleCanvasPointerDown(event));
+      this.canvas.addEventListener('click', (event) => this.handleCanvasClick(event));
       this.canvas.addEventListener('dblclick', (event) => this.handleNoteDoubleClick(event));
       this.canvas.addEventListener('input', (event) => this.handleInlineEditorInput(event));
       this.canvas.addEventListener('focusout', (event) => this.handleInlineEditorFocusOut(event));
@@ -76,6 +88,16 @@
       }
       if (this.modalFileInput) {
         this.modalFileInput.addEventListener('change', (event) => this.handleAttachmentUpload(event));
+      }
+
+      if (this.attachmentModal) {
+        this.attachmentModal.addEventListener('click', (event) => this.handleAttachmentModalClick(event));
+      }
+      if (this.attachmentModalFileInput) {
+        this.attachmentModalFileInput.addEventListener('change', (event) => this.handleAttachmentUpload(event));
+      }
+      if (this.attachmentModalCloseButton) {
+        this.attachmentModalCloseButton.addEventListener('click', () => this.closeAttachmentModal());
       }
       window.addEventListener('resize', this.boundResize);
     }
@@ -115,6 +137,7 @@
 
         this.notes = (notes || []).map((note) => ({
           ...note,
+          note_color: this.normalizeNoteColor(note.note_color),
           attachments: (attachments || []).filter((attachment) => String(attachment.note_id) === String(note.id)),
         }));
         this.normalizeAllPositions();
@@ -132,6 +155,7 @@
       this.render();
       this.hideActionBar();
       this.closeModal();
+      this.closeAttachmentModal();
     }
 
     handleCanvasDoubleClick(event) {
@@ -164,6 +188,7 @@
           pos_y: normalized.posY,
           width: normalized.width,
           height: normalized.height,
+          note_color: DEFAULT_NOTE_COLOR,
         })
         .select('*')
         .single();
@@ -177,7 +202,12 @@
     }
 
     handleCanvasPointerDown(event) {
-      const note = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note') : null;
+      if (!(event.target instanceof HTMLElement)) return;
+      if (event.target.closest('[data-note-action], .dashboard-note-color-dot')) {
+        event.preventDefault();
+        return;
+      }
+      const note = event.target.closest('.dashboard-note');
       if (!note) {
         this.clearSelection();
         return;
@@ -188,6 +218,10 @@
       if (!active) return;
 
       this.activeNoteId = active.id;
+      if (String(this.expandedNoteId) === String(active.id)) {
+        this.render();
+        return;
+      }
       this.pressState = {
         pointerId: event.pointerId,
         noteId: active.id,
@@ -202,6 +236,33 @@
       note.setPointerCapture(event.pointerId);
       this.bindDragListeners();
       this.render();
+    }
+
+    handleCanvasClick(event) {
+      if (!(event.target instanceof HTMLElement)) return;
+      const actionTrigger = event.target.closest('[data-note-action]');
+      const colorTrigger = event.target.closest('.dashboard-note-color-dot');
+      if (!actionTrigger && !colorTrigger) return;
+      const noteElement = event.target.closest('.dashboard-note');
+      const noteId = noteElement?.dataset.noteId;
+      const note = this.notes.find((entry) => String(entry.id) === String(noteId));
+      if (!note) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (colorTrigger) {
+        const selectedColor = colorTrigger.getAttribute('data-note-color');
+        if (!selectedColor || !NOTE_COLORS[selectedColor]) return;
+        this.applyNoteColor(note, selectedColor).catch((error) => this.reportError('Notizfarbe konnte nicht gespeichert werden.', error));
+        return;
+      }
+
+      const action = actionTrigger?.getAttribute('data-note-action');
+      if (action === 'attachments') {
+        this.openAttachmentModal(note.id);
+      } else if (action === 'collapse') {
+        this.collapseExpandedNote(note.id);
+      }
     }
 
     handleNoteDoubleClick(event) {
@@ -385,6 +446,21 @@
       this.modal.classList.add('hidden');
     }
 
+    openAttachmentModal(noteId) {
+      if (!this.attachmentModal) return;
+      this.activeNoteId = noteId;
+      this.attachmentModal.classList.remove('hidden');
+      this.renderAttachmentModal();
+    }
+
+    closeAttachmentModal() {
+      if (!this.attachmentModal) return;
+      this.attachmentModal.classList.add('hidden');
+      if (this.attachmentModalFileInput) {
+        this.attachmentModalFileInput.value = '';
+      }
+    }
+
     getActiveNote() {
       return this.notes.find((entry) => String(entry.id) === String(this.activeNoteId));
     }
@@ -410,6 +486,42 @@
           }).join('');
         }
       }
+    }
+
+    renderAttachmentModal() {
+      if (!this.attachmentModalList) return;
+      const note = this.getActiveNote();
+      if (!note) {
+        this.attachmentModalList.innerHTML = '<li class="subtle-text">Keine Notiz ausgewählt.</li>';
+        return;
+      }
+      if (!note.attachments?.length) {
+        this.attachmentModalList.innerHTML = '<li class="subtle-text">Keine Anhänge vorhanden.</li>';
+        return;
+      }
+      this.attachmentModalList.innerHTML = note.attachments.map((attachment) => {
+        const url = this.getAttachmentUrl(attachment);
+        const name = this.escapeHtml(attachment.file_name || 'Anhang');
+        return `<li class="dashboard-note-attachment-item">
+          <a href="${this.escapeAttribute(url)}" target="_blank" rel="noopener">${name}</a>
+          <button type="button" class="button button-danger dashboard-note-attachment-delete" data-attachment-id="${this.escapeAttribute(attachment.id)}">Löschen</button>
+        </li>`;
+      }).join('');
+    }
+
+    async handleAttachmentModalClick(event) {
+      if (!(event.target instanceof HTMLElement)) return;
+      if (event.target.closest('[data-close-note-attachment-modal="true"]')) {
+        this.closeAttachmentModal();
+        return;
+      }
+      const deleteButton = event.target.closest('.dashboard-note-attachment-delete');
+      if (!(deleteButton instanceof HTMLElement)) return;
+      const attachmentId = deleteButton.getAttribute('data-attachment-id');
+      if (!attachmentId) return;
+      await this.deleteAttachmentById(attachmentId);
+      this.renderAttachmentModal();
+      this.render();
     }
 
     handleModalInput() {
@@ -455,6 +567,7 @@
       this.notes = this.notes.filter((entry) => String(entry.id) !== String(noteId));
       if (String(this.activeNoteId) === String(noteId)) {
         this.activeNoteId = null;
+        this.closeAttachmentModal();
       }
       this.render();
     }
@@ -498,8 +611,25 @@
       if (this.modalFileInput) {
         this.modalFileInput.value = '';
       }
+      if (this.attachmentModalFileInput) {
+        this.attachmentModalFileInput.value = '';
+      }
       this.render();
       this.renderModal();
+      this.renderAttachmentModal();
+    }
+
+    async deleteAttachmentById(attachmentId) {
+      const supabase = this.getSupabase();
+      if (!supabase) return;
+      const note = this.getActiveNote();
+      const attachment = note?.attachments?.find((entry) => String(entry.id) === String(attachmentId));
+      if (!attachment) return;
+      await supabase.from(ATTACHMENTS_TABLE).update({ deleted_at: new Date().toISOString() }).eq('id', attachmentId);
+      if (attachment.file_path) {
+        await supabase.storage.from(STORAGE_BUCKET).remove([attachment.file_path]);
+      }
+      note.attachments = (note.attachments || []).filter((entry) => String(entry.id) !== String(attachmentId));
     }
 
     getAttachmentUrl(attachment) {
@@ -573,6 +703,7 @@
       this.editingNoteId = null;
       this.expandedNoteId = null;
       this.hideActionBar();
+      this.closeAttachmentModal();
       this.render();
     }
 
@@ -604,16 +735,32 @@
         const noteHeight = Number(note.height || DEFAULT_NOTE_HEIGHT);
         const renderedWidth = isExpanded ? noteWidth * EXPANDED_NOTE_WIDTH_MULTIPLIER : noteWidth;
         const renderedHeight = isExpanded ? noteHeight * EXPANDED_NOTE_HEIGHT_MULTIPLIER : noteHeight;
+        const noteColorKey = this.normalizeNoteColor(note.note_color);
+        const colorDots = Object.entries(NOTE_COLORS).map(([key, value]) => `
+          <button
+            type="button"
+            class="dashboard-note-color-dot ${key === noteColorKey ? 'is-selected' : ''}"
+            data-note-color="${this.escapeAttribute(key)}"
+            style="--note-color-dot:${this.escapeAttribute(value)}"
+            aria-label="Notizfarbe ${this.escapeAttribute(key)} auswählen"
+          ></button>
+        `).join('');
         return `
           <article
             class="dashboard-note ${String(this.activeNoteId) === String(note.id) ? 'active' : ''} ${isExpanded ? 'is-expanded' : ''} ${isEditing ? 'is-editing' : ''}"
             data-note-id="${this.escapeAttribute(note.id)}"
-            style="left:${Number(note.pos_x || 0)}px; top:${Number(note.pos_y || 0)}px; width:${renderedWidth}px; height:${renderedHeight}px;"
+            style="left:${Number(note.pos_x || 0)}px; top:${Number(note.pos_y || 0)}px; width:${renderedWidth}px; height:${renderedHeight}px; --dashboard-note-color:${this.escapeAttribute(NOTE_COLORS[noteColorKey])};"
           >
             <div class="dashboard-note-content" contenteditable="${isEditing ? 'true' : 'false'}" spellcheck="true">${this.escapeHtml(preview || ' ')}</div>
             <footer class="dashboard-note-footer">
-              <span>${isEditing ? 'Bearbeiten…' : 'Kurzansicht'}</span>
-              <span>📎 ${attachmentCount}</span>
+              <div class="dashboard-note-footer-left">
+                <span>${isEditing ? 'Bearbeiten' : 'Kurzansicht'}</span>
+                ${isExpanded ? `<div class="dashboard-note-colors">${colorDots}</div>` : ''}
+              </div>
+              <div class="dashboard-note-footer-actions">
+                <button type="button" class="dashboard-note-icon-button" data-note-action="attachments" aria-label="Anhänge öffnen">📎 ${attachmentCount}</button>
+                ${isExpanded ? '<button type="button" class="dashboard-note-icon-button" data-note-action="collapse">Schließen</button>' : ''}
+              </div>
             </footer>
           </article>
         `;
@@ -650,6 +797,13 @@
       this.render();
     }
 
+    collapseExpandedNote(noteId) {
+      if (String(this.expandedNoteId) !== String(noteId)) return;
+      this.expandedNoteId = null;
+      this.editingNoteId = null;
+      this.render();
+    }
+
     handleInlineEditorInput(event) {
       const contentEl = event.target instanceof HTMLElement ? event.target.closest('.dashboard-note-content') : null;
       if (!contentEl) return;
@@ -668,8 +822,10 @@
       const noteId = noteElement?.dataset.noteId;
       if (!noteId) return;
       this.persistInlineSave(noteId).catch((error) => this.reportError('Notiz konnte nicht gespeichert werden.', error));
-      this.editingNoteId = null;
-      this.render();
+      if (String(this.expandedNoteId) !== String(noteId)) {
+        this.editingNoteId = null;
+        this.render();
+      }
     }
 
     scheduleInlineSave(noteId) {
@@ -698,6 +854,20 @@
       if (!supabase || !note) return;
       note.content = String(content || '');
       const { error } = await supabase.from(DASHBOARD_TABLE).update({ content: note.content }).eq('id', note.id);
+      if (error) throw error;
+    }
+
+    normalizeNoteColor(colorValue) {
+      return NOTE_COLORS[colorValue] ? colorValue : DEFAULT_NOTE_COLOR;
+    }
+
+    async applyNoteColor(note, colorKey) {
+      const supabase = this.getSupabase();
+      if (!note || !NOTE_COLORS[colorKey]) return;
+      note.note_color = colorKey;
+      this.render();
+      if (!supabase) return;
+      const { error } = await supabase.from(DASHBOARD_TABLE).update({ note_color: colorKey }).eq('id', note.id);
       if (error) throw error;
     }
 
