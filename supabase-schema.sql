@@ -42,6 +42,7 @@ create table public.crm_contacts (
   postal_code text,
   phone text,
   email text,
+  notizen jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );

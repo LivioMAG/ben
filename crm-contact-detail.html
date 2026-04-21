@@ -31,36 +31,12 @@
         <h2>Neue Notiz</h2>
         <div id="alert" class="alert hidden"></div>
         <form id="noteForm" class="form-grid">
-          <label>
-            <span>Absender *</span>
-            <select id="senderUidInput" required></select>
-          </label>
-          <label>
-            <span>Empfänger</span>
-            <select id="recipientUidInput"></select>
-          </label>
-          <label>
-            <span>Kategorisierung</span>
-            <select id="noteCategoryInput">
-              <option value="information">Information</option>
-              <option value="aufgabe">Aufgabe</option>
-              <option value="rueckfrage">Rückfrage</option>
-            </select>
-          </label>
-          <label>
-            <span>Note Ranking</span>
-            <select id="noteRankingInput">
-              <option value="3">3 - Wichtig</option>
-              <option value="2" selected>2 - Normal</option>
-              <option value="1">1 - Unwichtig</option>
-            </select>
-          </label>
           <label class="full-width">
-            <span>Kommentar *</span>
+            <span>Notiz *</span>
             <textarea id="noteTextInput" rows="4" required></textarea>
           </label>
           <label class="full-width">
-            <span>Attachment (PDF)</span>
+            <span>Anhänge (PDF)</span>
             <input id="noteAttachmentInput" type="file" accept="application/pdf,.pdf" multiple />
           </label>
           <div class="full-width">

@@ -954,11 +954,7 @@ tbody tr:hover {
   border: 1px solid rgba(17, 17, 17, 0.08);
   border-radius: 18px;
   overflow: hidden;
-  background:
-    linear-gradient(rgba(17, 17, 17, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(17, 17, 17, 0.03) 1px, transparent 1px),
-    rgba(255, 255, 255, 0.7);
-  background-size: 4px 4px;
+  background: #ffffff;
 }
 
 .dashboard-note-empty {
@@ -975,7 +971,7 @@ tbody tr:hover {
   padding: 8px;
   border-radius: 10px;
   border: 1px solid rgba(17, 17, 17, 0.1);
-  background: var(--dashboard-note-color, #fff2b8);
+  background: var(--dashboard-note-color, #ffd8b0);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.13);
   display: grid;
   gap: 6px;
