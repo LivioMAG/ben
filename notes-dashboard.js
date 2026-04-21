@@ -10,9 +10,10 @@
   const LONG_PRESS_DELAY_MS = 520;
   const DRAG_START_THRESHOLD_PX = 6;
   const EXPANDED_NOTE_TODO_MAX_ITEMS = 8;
-  const EXPANDED_NOTE_FIXED_WIDTH = 500;
-  const EXPANDED_NOTE_FIXED_HEIGHT = 300;
+  const EXPANDED_NOTE_FIXED_WIDTH = 400;
+  const EXPANDED_NOTE_BASE_HEIGHT = 300;
   const EXPANDED_NOTE_CONTENT_HEIGHT = 200;
+  const EXPANDED_NOTE_TODO_HEIGHT_STEP = 30;
   const EXPANDED_NOTE_PADDING = 12;
   const DEFAULT_NOTE_COLOR = 'yellow';
   const NOTE_COLORS = {
@@ -729,7 +730,7 @@
         const canvasWidth = Number(this.canvas?.clientWidth || 0);
         const canvasHeight = Number(this.canvas?.clientHeight || 0);
         const expandedWidth = this.getExpandedWidth(canvasWidth);
-        const expandedHeight = this.getExpandedHeight(canvasHeight);
+        const expandedHeight = this.getExpandedHeight(note, canvasHeight);
         const expandedPosition = this.getExpandedPosition(note, expandedWidth, expandedHeight);
         const renderedWidth = isExpanded
           ? expandedWidth
@@ -739,6 +740,7 @@
           : noteHeight;
         const renderedLeft = isExpanded ? expandedPosition.posX : Number(note.pos_x || 0);
         const renderedTop = isExpanded ? expandedPosition.posY : Number(note.pos_y || 0);
+        const expandedContentHeight = Math.min(EXPANDED_NOTE_CONTENT_HEIGHT + (clampedTodoCount * EXPANDED_NOTE_TODO_HEIGHT_STEP), Math.max(80, renderedHeight - 100));
         const noteColorKey = this.normalizeNoteColor(note.note_color);
         const colorDots = Object.entries(NOTE_COLORS).map(([key, value]) => `
           <button
@@ -795,7 +797,7 @@
           <article
             class="dashboard-note ${String(this.activeNoteId) === String(note.id) ? 'active' : ''} ${isExpanded ? 'is-expanded' : ''} ${isEditing ? 'is-editing' : ''}"
             data-note-id="${this.escapeAttribute(note.id)}"
-            style="left:${renderedLeft}px; top:${renderedTop}px; width:${renderedWidth}px; height:${renderedHeight}px; --dashboard-note-color:${this.escapeAttribute(NOTE_COLORS[noteColorKey])};"
+            style="left:${renderedLeft}px; top:${renderedTop}px; width:${renderedWidth}px; height:${renderedHeight}px; --dashboard-note-color:${this.escapeAttribute(NOTE_COLORS[noteColorKey])}; --dashboard-expanded-note-content-height:${expandedContentHeight}px;"
           >
             <div class="dashboard-note-content" contenteditable="${isEditing ? 'true' : 'false'}" spellcheck="true">${this.escapeHtml(preview || ' ')}</div>
             ${todoMarkup}
@@ -820,9 +822,11 @@
       return Math.max(240, Math.min(EXPANDED_NOTE_FIXED_WIDTH, maxExpandedWidth));
     }
 
-    getExpandedHeight(canvasHeight = Number(this.canvas?.clientHeight || 0)) {
+    getExpandedHeight(note, canvasHeight = Number(this.canvas?.clientHeight || 0)) {
+      const todoCount = Array.isArray(note?.todos) ? note.todos.length : 0;
+      const desiredHeight = EXPANDED_NOTE_BASE_HEIGHT + (Math.max(0, todoCount) * EXPANDED_NOTE_TODO_HEIGHT_STEP);
       const maxExpandedHeight = this.getExpandedMaxHeight(canvasHeight);
-      return Math.max(140, Math.min(EXPANDED_NOTE_FIXED_HEIGHT, maxExpandedHeight));
+      return Math.max(140, Math.min(desiredHeight, maxExpandedHeight));
     }
 
     getExpandedMaxWidth(canvasWidth = Number(this.canvas?.clientWidth || 0)) {
@@ -881,9 +885,7 @@
 
     applyExpandedLayoutVariables() {
       if (!this.canvas) return;
-      const expandedHeight = this.getExpandedHeight(Number(this.canvas?.clientHeight || 0));
-      const contentHeight = Math.min(EXPANDED_NOTE_CONTENT_HEIGHT, Math.max(80, expandedHeight - 100));
-      this.canvas.style.setProperty('--dashboard-expanded-note-content-height', `${contentHeight}px`);
+      this.canvas.style.setProperty('--dashboard-expanded-note-content-height', `${EXPANDED_NOTE_CONTENT_HEIGHT}px`);
     }
 
     handleInlineEditorInput(event) {

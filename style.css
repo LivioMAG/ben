@@ -1160,7 +1160,7 @@ tbody tr:hover {
 
 .dashboard-note.is-expanded .dashboard-note-todo-section {
   min-height: 0;
-  overflow: auto;
+  overflow: visible;
 }
 
 .notes-dashboard-action-bar {
