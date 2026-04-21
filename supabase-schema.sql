@@ -143,12 +143,14 @@ create table public.daily_assignments (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.app_profiles(id) on delete cascade,
   assignment_date date not null,
+  start_time time not null default '07:00',
+  end_time time not null default '16:30',
   project_id uuid references public.projects(id) on delete set null,
   label text not null,
   source text not null default 'manual',
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
-  constraint daily_assignments_unique_profile_day unique (profile_id, assignment_date)
+  constraint daily_assignments_time_range_check check (end_time > start_time)
 );
 
 create table public.material_entries (
@@ -487,7 +489,7 @@ create index weekly_reports_profile_work_date_idx on public.weekly_reports (prof
 create index weekly_reports_year_kw_idx on public.weekly_reports (year, kw);
 create index holiday_requests_profile_dates_idx on public.holiday_requests (profile_id, start_date, end_date);
 create index request_history_profile_created_at_idx on public.request_history (profile_id, created_at desc);
-create index daily_assignments_profile_date_idx on public.daily_assignments (profile_id, assignment_date);
+create index daily_assignments_profile_date_time_idx on public.daily_assignments (profile_id, assignment_date, start_time, end_time);
 create index crm_contacts_last_name_idx on public.crm_contacts (last_name, first_name);
 create index properties_contact_created_idx on public.properties (contact_id, created_at desc);
 create index notes_target_uid_created_at_idx on public.notes (target_uid, created_at desc);
