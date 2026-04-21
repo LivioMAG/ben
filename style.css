@@ -1011,8 +1011,6 @@ tbody tr:hover {
   list-style: none;
   display: grid;
   gap: 4px;
-  max-height: 42%;
-  overflow: auto;
 }
 
 .dashboard-note-todo-item {
@@ -1059,6 +1057,31 @@ tbody tr:hover {
   gap: 6px;
 }
 
+.dashboard-note-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 110px;
+}
+
+.dashboard-note-progress-text {
+  min-width: 28px;
+}
+
+.dashboard-note-progress-track {
+  width: 68px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(17, 17, 17, 0.18);
+  overflow: hidden;
+}
+
+.dashboard-note-progress-fill {
+  height: 100%;
+  background: rgba(17, 17, 17, 0.48);
+  border-radius: 999px;
+}
+
 .dashboard-note-icon-button {
   border: 1px solid rgba(17, 17, 17, 0.15);
   background: rgba(255, 255, 255, 0.75);
@@ -1067,6 +1090,11 @@ tbody tr:hover {
   font-size: 10px;
   line-height: 1.4;
   cursor: pointer;
+}
+
+.dashboard-note-icon-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .dashboard-note-colors {
