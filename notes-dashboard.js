@@ -10,10 +10,9 @@
   const LONG_PRESS_DELAY_MS = 520;
   const DRAG_START_THRESHOLD_PX = 6;
   const EXPANDED_NOTE_WIDTH_MULTIPLIER = 2;
-  const EXPANDED_NOTE_HEIGHT_MULTIPLIER = 2;
-  const EXPANDED_NOTE_TODO_BASE_EXTRA_HEIGHT = 72;
-  const EXPANDED_NOTE_TODO_ITEM_EXTRA_HEIGHT = 24;
-  const EXPANDED_NOTE_TODO_MAX_EXTRA_HEIGHT = 240;
+  const EXPANDED_NOTE_TODO_MAX_ITEMS = 10;
+  const EXPANDED_NOTE_TODO_BASE_EXTRA_HEIGHT = 12;
+  const EXPANDED_NOTE_TODO_ITEM_EXTRA_HEIGHT = 30;
   const DEFAULT_NOTE_COLOR = 'yellow';
   const NOTE_COLORS = {
     green: '#dff4df',
@@ -719,11 +718,14 @@
         const attachmentCount = Array.isArray(note.attachments) ? note.attachments.length : 0;
         const todoItems = Array.isArray(note.todos) ? note.todos : [];
         const todoCount = todoItems.length;
+        const clampedTodoCount = Math.min(todoCount, EXPANDED_NOTE_TODO_MAX_ITEMS);
+        const completedTodoCount = todoItems.filter((todo) => Boolean(todo.is_done)).length;
+        const progressPercent = clampedTodoCount ? Math.round((completedTodoCount / clampedTodoCount) * 100) : 0;
         const noteWidth = Number(note.width || DEFAULT_NOTE_WIDTH);
         const noteHeight = Number(note.height || DEFAULT_NOTE_HEIGHT);
         const renderedWidth = isExpanded ? noteWidth * EXPANDED_NOTE_WIDTH_MULTIPLIER : noteWidth;
         const renderedHeight = isExpanded
-          ? (noteHeight * EXPANDED_NOTE_HEIGHT_MULTIPLIER) + this.getExpandedTodoExtraHeight(todoCount)
+          ? noteHeight + this.getExpandedTodoExtraHeight(clampedTodoCount)
           : noteHeight;
         const noteColorKey = this.normalizeNoteColor(note.note_color);
         const colorDots = Object.entries(NOTE_COLORS).map(([key, value]) => `
@@ -759,6 +761,16 @@
             </ul>
           </section>
         ` : '';
+        const footerInfoMarkup = clampedTodoCount
+          ? `
+            <div class="dashboard-note-progress" aria-label="To-do Fortschritt ${completedTodoCount} von ${clampedTodoCount}">
+              <span class="dashboard-note-progress-text">${completedTodoCount}/${clampedTodoCount}</span>
+              <div class="dashboard-note-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="${clampedTodoCount}" aria-valuenow="${completedTodoCount}">
+                <div class="dashboard-note-progress-fill" style="width:${progressPercent}%;"></div>
+              </div>
+            </div>
+          `
+          : '<span>Notiz</span>';
         return `
           <article
             class="dashboard-note ${String(this.activeNoteId) === String(note.id) ? 'active' : ''} ${isExpanded ? 'is-expanded' : ''} ${isEditing ? 'is-editing' : ''}"
@@ -769,12 +781,12 @@
             ${todoMarkup}
             <footer class="dashboard-note-footer">
               <div class="dashboard-note-footer-left">
-                <span>${isEditing ? 'Bearbeiten' : 'Kurzansicht'}</span>
+                ${footerInfoMarkup}
                 ${isExpanded ? `<div class="dashboard-note-colors">${colorDots}</div>` : ''}
               </div>
               <div class="dashboard-note-footer-actions">
                 <button type="button" class="dashboard-note-icon-button" data-note-action="attachments" aria-label="Anhänge öffnen">📎 ${attachmentCount}</button>
-                ${isExpanded ? '<button type="button" class="dashboard-note-icon-button" data-note-action="add-todo" aria-label="To-do hinzufügen">☑️</button>' : ''}
+                ${isExpanded ? `<button type="button" class="dashboard-note-icon-button" data-note-action="add-todo" aria-label="To-do hinzufügen" ${clampedTodoCount >= EXPANDED_NOTE_TODO_MAX_ITEMS ? 'disabled' : ''}>☑️</button>` : ''}
               </div>
             </footer>
           </article>
@@ -792,8 +804,7 @@
 
     getExpandedTodoExtraHeight(todoCount) {
       if (!todoCount) return 0;
-      const desiredHeight = EXPANDED_NOTE_TODO_BASE_EXTRA_HEIGHT + (todoCount * EXPANDED_NOTE_TODO_ITEM_EXTRA_HEIGHT);
-      return Math.min(EXPANDED_NOTE_TODO_MAX_EXTRA_HEIGHT, desiredHeight);
+      return EXPANDED_NOTE_TODO_BASE_EXTRA_HEIGHT + (todoCount * EXPANDED_NOTE_TODO_ITEM_EXTRA_HEIGHT);
     }
 
     focusInlineEditorIfNeeded() {
@@ -897,8 +908,12 @@
       if (!supabase || !userId) return;
       const note = this.notes.find((entry) => String(entry.id) === String(noteId));
       if (!note) return;
+      const todoCount = Array.isArray(note.todos) ? note.todos.length : 0;
+      if (todoCount >= EXPANDED_NOTE_TODO_MAX_ITEMS) {
+        return;
+      }
 
-      const nextPosition = (note.todos || []).length;
+      const nextPosition = todoCount;
       const { data, error } = await supabase
         .from(TODOS_TABLE)
         .insert({
