@@ -203,7 +203,21 @@
 
     handleCanvasPointerDown(event) {
       if (!(event.target instanceof HTMLElement)) return;
-      if (event.target.closest('[data-note-action], .dashboard-note-color-dot')) {
+      const colorTrigger = event.target.closest('.dashboard-note-color-dot');
+      if (colorTrigger) {
+        const noteElement = event.target.closest('.dashboard-note');
+        const noteId = noteElement?.dataset.noteId;
+        const note = this.notes.find((entry) => String(entry.id) === String(noteId));
+        const selectedColor = colorTrigger.getAttribute('data-note-color');
+        if (note && selectedColor && NOTE_COLORS[selectedColor]) {
+          this.activeNoteId = note.id;
+          this.applyNoteColor(note, selectedColor).catch((error) => this.reportError('Notizfarbe konnte nicht gespeichert werden.', error));
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+      if (event.target.closest('[data-note-action]')) {
         event.preventDefault();
         return;
       }
@@ -759,7 +773,6 @@
               </div>
               <div class="dashboard-note-footer-actions">
                 <button type="button" class="dashboard-note-icon-button" data-note-action="attachments" aria-label="Anhänge öffnen">📎 ${attachmentCount}</button>
-                ${isExpanded ? '<button type="button" class="dashboard-note-icon-button" data-note-action="collapse">Schließen</button>' : ''}
               </div>
             </footer>
           </article>
