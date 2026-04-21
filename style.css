@@ -945,6 +945,8 @@ tbody tr:hover {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  background: #ffffff;
+  backdrop-filter: none;
 }
 
 .notes-dashboard-canvas {
