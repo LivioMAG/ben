@@ -193,8 +193,9 @@ function updateSlotEndByDuration(slotId, options = {}) {
   if (!row) return;
   const startInput = row.querySelector('[data-field="start"]');
   const endInput = row.querySelector('[data-field="end"]');
+  if (!startInput || !endInput) return;
   const durationHours = parseFloat(elements.slotDuration.value || String(DEFAULT_DURATION_HOURS));
-  if (!startInput?.value || !Number.isFinite(durationHours) || durationHours <= 0) return;
+  if (!startInput.value || !Number.isFinite(durationHours) || durationHours <= 0) return;
   if (endInput.value && !options.force) return;
   endInput.value = addHoursToTime(startInput.value, durationHours);
 }
@@ -243,9 +244,15 @@ function collectAndValidateForm() {
 
   const slotRows = [...elements.slotsContainer.querySelectorAll('[data-slot-id]')];
   const slots = slotRows.map((row, index) => {
-    const date = row.querySelector('[data-field="date"]').value;
-    const start = row.querySelector('[data-field="start"]').value;
-    const end = row.querySelector('[data-field="end"]').value;
+    const dateInput = row.querySelector('[data-field="date"]');
+    const startInput = row.querySelector('[data-field="start"]');
+    const endInput = row.querySelector('[data-field="end"]');
+    if (!dateInput || !startInput || !endInput) {
+      throw new Error(`Zeitfenster ${index + 1} ist beschädigt. Bitte Zeile entfernen und neu anlegen.`);
+    }
+    const date = dateInput.value;
+    const start = startInput.value;
+    const end = endInput.value;
     if (!date || !start || !end) {
       throw new Error(`Zeitfenster ${index + 1} ist unvollständig.`);
     }
