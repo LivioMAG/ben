@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Separate Buchung · Verfügbarkeitsprüfung</title>
+    <link rel="stylesheet" href="./style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <header class="page-header">
+        <h1>Separate Einsatzbuchung</h1>
+        <p>
+          Eigenständige Seite für die Auswahl einer vorhandenen Immobilie,
+          Prüfung der Monteur-Verfügbarkeit und automatische Anlage von Auftrag,
+          Disposition und Kanban-Eintrag.
+        </p>
+      </header>
+
+      <section class="card">
+        <form id="bookingForm" novalidate>
+          <div class="field">
+            <label for="propertySearch">Immobilie suchen *</label>
+            <input
+              id="propertySearch"
+              type="text"
+              autocomplete="off"
+              placeholder="Name, Straße, Ort oder PLZ eingeben"
+              required
+            />
+            <div id="propertyResults" class="autocomplete-list" role="listbox"></div>
+            <p id="propertySelectionInfo" class="hint"></p>
+          </div>
+
+          <div class="field">
+            <label for="description">Beschreibung / Hinweise *</label>
+            <textarea
+              id="description"
+              rows="4"
+              placeholder="Kurzbeschreibung für Auftrag und Kanban"
+              required
+            ></textarea>
+          </div>
+
+          <div class="field-inline">
+            <div class="field">
+              <label for="slotDuration">Dauer je Zeitfenster (Stunden) *</label>
+              <input id="slotDuration" type="number" min="1" step="0.5" value="2" required />
+            </div>
+            <div class="field align-end">
+              <button id="addSlotButton" type="button" class="secondary">+ Zeitfenster hinzufügen</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Mögliche Zeitfenster *</label>
+            <div id="slotsContainer" class="slots"></div>
+          </div>
+
+          <div class="actions">
+            <button id="submitButton" type="submit">Verfügbarkeit prüfen &amp; Auftrag anlegen</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="statusCard" class="card hidden" aria-live="polite">
+        <h2>Status</h2>
+        <p id="statusMessage"></p>
+      </section>
+
+      <section id="resultCard" class="card hidden" aria-live="polite">
+        <h2>Buchung erfolgreich</h2>
+        <dl class="result-grid">
+          <dt>Immobilie</dt>
+          <dd id="resultProperty"></dd>
+          <dt>Zeitfenster</dt>
+          <dd id="resultSlot"></dd>
+          <dt>Monteur</dt>
+          <dd id="resultTechnician"></dd>
+          <dt>Auftrag / Kommission</dt>
+          <dd id="resultOrder"></dd>
+          <dt>Disposition</dt>
+          <dd>Erstellt</dd>
+          <dt>Kanban</dt>
+          <dd>Erstellt</dd>
+        </dl>
+      </section>
+    </main>
+  </body>
+</html>
