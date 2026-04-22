@@ -9,6 +9,9 @@ const state = {
   properties: [],
   selectedProperty: null,
   slots: [],
+  availabilityOptions: [],
+  availabilityOffset: 0,
+  pendingPayload: null,
   isSubmitting: false,
 };
 
@@ -39,6 +42,10 @@ function cacheElements() {
   elements.addSlotButton = document.getElementById('addSlotButton');
   elements.slotsContainer = document.getElementById('slotsContainer');
   elements.submitButton = document.getElementById('submitButton');
+  elements.availabilityCard = document.getElementById('availabilityCard');
+  elements.availabilityInfo = document.getElementById('availabilityInfo');
+  elements.availabilityList = document.getElementById('availabilityList');
+  elements.loadMoreButton = document.getElementById('loadMoreButton');
   elements.statusCard = document.getElementById('statusCard');
   elements.statusMessage = document.getElementById('statusMessage');
   elements.resultCard = document.getElementById('resultCard');
@@ -78,6 +85,8 @@ function bindEvents() {
   elements.slotDuration?.addEventListener('change', () => {
     state.slots.forEach((slot) => updateSlotEndByDuration(slot.id));
   });
+
+  elements.loadMoreButton?.addEventListener('click', () => renderMoreAvailability());
 }
 
 async function initializeSupabase() {
@@ -208,18 +217,21 @@ async function handleSubmit(event) {
     setSubmitting(true);
     setStatus('Prüfe Verfügbarkeiten…', false);
     hideResult();
+    hideAvailability();
 
     const payload = collectAndValidateForm();
-    const match = await findFirstAvailableTechnician(payload.slots);
+    const matches = await findAvailableTechnicians(payload.slots);
+    state.pendingPayload = payload;
+    state.availabilityOptions = matches;
+    state.availabilityOffset = 0;
 
-    if (!match) {
+    if (!matches.length) {
       setStatus('Für die angegebenen Zeitfenster wurde kein verfügbarer Monteur gefunden.', true);
       return;
     }
 
-    const bookingResult = await createBooking(payload, match);
-    showResult(bookingResult);
-    setStatus('Buchung erfolgreich erstellt und eingeplant.', false);
+    renderMoreAvailability({ reset: true });
+    setStatus('Verfügbarkeiten geladen. Bitte einen Termin auswählen.', false);
   } catch (error) {
     setStatus(`Fehler: ${error.message}`, true);
   } finally {
@@ -274,9 +286,9 @@ function collectAndValidateForm() {
   };
 }
 
-async function findFirstAvailableTechnician(slots) {
+async function findAvailableTechnicians(slots) {
   const technicians = await loadTechnicians();
-  if (!technicians.length) return null;
+  if (!technicians.length) return [];
 
   const uniqueDates = [...new Set(slots.map((slot) => slot.date))].sort();
   const minDate = uniqueDates[0];
@@ -288,7 +300,10 @@ async function findFirstAvailableTechnician(slots) {
     loadPlatformHolidays(uniqueDates),
   ]);
 
-  for (const slot of slots) {
+  const matches = [];
+  const sortedSlots = [...slots].sort(compareSlotDateTime);
+
+  for (const slot of sortedSlots) {
     if (holidays.has(slot.date)) {
       continue;
     }
@@ -304,12 +319,12 @@ async function findFirstAvailableTechnician(slots) {
       });
 
       if (!hasOverlap) {
-        return { slot, technician };
+        matches.push({ slot, technician });
       }
     }
   }
 
-  return null;
+  return matches;
 }
 
 async function loadTechnicians() {
@@ -463,10 +478,81 @@ function hideResult() {
   elements.resultCard.classList.add('hidden');
 }
 
+function hideAvailability() {
+  elements.availabilityCard.classList.add('hidden');
+  elements.availabilityList.innerHTML = '';
+  elements.loadMoreButton.classList.add('hidden');
+}
+
+function renderMoreAvailability(options = {}) {
+  const shouldReset = Boolean(options.reset);
+  if (shouldReset) {
+    elements.availabilityList.innerHTML = '';
+    state.availabilityOffset = 0;
+  }
+
+  const pageSize = 10;
+  const nextOptions = state.availabilityOptions.slice(state.availabilityOffset, state.availabilityOffset + pageSize);
+  if (!nextOptions.length) return;
+
+  const fragment = document.createDocumentFragment();
+  nextOptions.forEach((option, index) => {
+    const optionIndex = state.availabilityOffset + index;
+    const card = document.createElement('article');
+    card.className = 'availability-item';
+    card.innerHTML = `
+      <div>
+        <strong>Option ${optionIndex + 1}: ${formatDate(option.slot.date)} · ${option.slot.start}–${option.slot.end}</strong>
+        <p class="availability-item-meta">Monteur: ${escapeHtml(option.technician.full_name)}</p>
+      </div>
+      <button type="button" data-action="book-option" data-option-index="${optionIndex}">Diesen Termin wählen</button>
+    `;
+    fragment.appendChild(card);
+  });
+
+  elements.availabilityList.appendChild(fragment);
+  elements.availabilityCard.classList.remove('hidden');
+
+  state.availabilityOffset += nextOptions.length;
+  const hasMore = state.availabilityOffset < state.availabilityOptions.length;
+  elements.loadMoreButton.classList.toggle('hidden', !hasMore);
+  elements.availabilityInfo.textContent = hasMore
+    ? `${state.availabilityOffset} von ${state.availabilityOptions.length} Terminen angezeigt.`
+    : `${state.availabilityOptions.length} Termine verfügbar.`;
+
+  elements.availabilityList.querySelectorAll('[data-action="book-option"]').forEach((button) => {
+    if (button.dataset.bound === '1') return;
+    button.dataset.bound = '1';
+    button.addEventListener('click', handleBookOption);
+  });
+}
+
+async function handleBookOption(event) {
+  const optionIndex = Number(event.currentTarget.getAttribute('data-option-index'));
+  const match = state.availabilityOptions[optionIndex];
+  if (!match || !state.pendingPayload || state.isSubmitting) return;
+
+  try {
+    setSubmitting(true);
+    setStatus('Lege Auftrag für gewählten Termin an…', false);
+    const bookingResult = await createBooking(state.pendingPayload, match);
+    showResult(bookingResult);
+    setStatus('Buchung erfolgreich erstellt und eingeplant.', false);
+  } catch (error) {
+    setStatus(`Fehler: ${error.message}`, true);
+  } finally {
+    setSubmitting(false);
+  }
+}
+
 function setSubmitting(isSubmitting) {
   state.isSubmitting = isSubmitting;
   elements.submitButton.disabled = isSubmitting;
   elements.addSlotButton.disabled = isSubmitting;
+  elements.loadMoreButton.disabled = isSubmitting;
+  elements.availabilityList.querySelectorAll('[data-action="book-option"]').forEach((button) => {
+    button.disabled = isSubmitting;
+  });
 }
 
 function setStatus(message, isError) {
@@ -492,6 +578,14 @@ function addHoursToTime(timeValue, hoursToAdd) {
 function formatDate(dateValue) {
   const [year, month, day] = dateValue.split('-').map(Number);
   return `${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}.${year}`;
+}
+
+function compareSlotDateTime(a, b) {
+  const dateCompare = a.date.localeCompare(b.date);
+  if (dateCompare !== 0) return dateCompare;
+  const startCompare = a.start.localeCompare(b.start);
+  if (startCompare !== 0) return startCompare;
+  return a.end.localeCompare(b.end);
 }
 
 function escapeHtml(value) {

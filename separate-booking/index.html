@@ -60,9 +60,18 @@
           </div>
 
           <div class="actions">
-            <button id="submitButton" type="submit">Verfügbarkeit prüfen &amp; Auftrag anlegen</button>
+            <button id="submitButton" type="submit">Verfügbarkeit anzeigen</button>
           </div>
         </form>
+      </section>
+
+      <section id="availabilityCard" class="card hidden" aria-live="polite">
+        <h2>Verfügbare Termine</h2>
+        <p id="availabilityInfo" class="hint"></p>
+        <div id="availabilityList" class="availability-list"></div>
+        <div class="actions availability-actions">
+          <button id="loadMoreButton" type="button" class="secondary hidden">Weitere Termine anzeigen</button>
+        </div>
       </section>
 
       <section id="statusCard" class="card hidden" aria-live="polite">
