@@ -268,7 +268,11 @@ async function findAvailabilitySuggestions(payload) {
           if (assignment.profile_id !== technician.id || assignment.assignment_date !== slot.date) {
             return false;
           }
-          return assignment.start_time < slot.end && assignment.end_time > slot.start;
+          const assignmentStartMinutes = timeToMinutes(assignment.start_time);
+          const assignmentEndMinutes = timeToMinutes(assignment.end_time);
+          const slotStartMinutes = timeToMinutes(slot.start);
+          const slotEndMinutes = timeToMinutes(slot.end);
+          return assignmentStartMinutes < slotEndMinutes && assignmentEndMinutes > slotStartMinutes;
         });
         return !hasOverlap;
       });
