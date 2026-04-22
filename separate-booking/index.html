@@ -49,14 +49,21 @@
               <label for="slotDuration">Dauer je Zeitfenster (Stunden) *</label>
               <input id="slotDuration" type="number" min="1" step="0.5" value="2" required />
             </div>
-            <div class="field align-end">
-              <button id="addSlotButton" type="button" class="secondary">+ Zeitfenster hinzufügen</button>
+            <div class="field">
+              <label for="searchDate">Suche ab Datum *</label>
+              <input id="searchDate" type="date" required />
             </div>
           </div>
 
-          <div class="field">
-            <label>Mögliche Zeitfenster *</label>
-            <div id="slotsContainer" class="slots"></div>
+          <div class="field-inline search-window">
+            <div class="field">
+              <label for="searchStartTime">Suche zwischen (von) *</label>
+              <input id="searchStartTime" type="time" value="07:00" required />
+            </div>
+            <div class="field">
+              <label for="searchEndTime">Suche zwischen (bis) *</label>
+              <input id="searchEndTime" type="time" value="16:30" required />
+            </div>
           </div>
 
           <div class="actions">
