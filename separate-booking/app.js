@@ -1,6 +1,10 @@
 const CONFIG_PATH = '../supabase-config.json';
-const DEFAULT_SLOT_START = '08:00';
 const DEFAULT_DURATION_HOURS = 2;
+const DEFAULT_SEARCH_START = '07:00';
+const DEFAULT_SEARCH_END = '16:30';
+const SEARCH_STEP_MINUTES = 30;
+const SEARCH_MAX_DAYS = 180;
+const SEARCH_MAX_RESULTS = 200;
 const ALLOWED_ROLE_PARTS = ['monteur', 'service', 'elektroinstallateur'];
 
 const state = {
@@ -8,7 +12,6 @@ const state = {
   user: null,
   properties: [],
   selectedProperty: null,
-  slots: [],
   availabilityOptions: [],
   availabilityOffset: 0,
   pendingPayload: null,
@@ -22,14 +25,23 @@ document.addEventListener('DOMContentLoaded', init);
 async function init() {
   cacheElements();
   bindEvents();
-  addSlotRow();
+  setDefaultSearchDate();
   try {
     await initializeSupabase();
     await preloadProperties();
-    setStatus('Seite bereit. Bitte Immobilie auswählen und Zeitfenster erfassen.', false);
+    setStatus('Seite bereit. Bitte Immobilie, Dauer und Suchrahmen erfassen.', false);
   } catch (error) {
     setStatus(`Initialisierung fehlgeschlagen: ${error.message}`, true);
   }
+}
+
+function setDefaultSearchDate() {
+  if (!elements.searchDate) return;
+  const today = new Date();
+  const defaultDate = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, '0')}-${String(today.getUTCDate()).padStart(2, '0')}`;
+  elements.searchDate.value = defaultDate;
+  if (elements.searchStartTime) elements.searchStartTime.value = DEFAULT_SEARCH_START;
+  if (elements.searchEndTime) elements.searchEndTime.value = DEFAULT_SEARCH_END;
 }
 
 function cacheElements() {
@@ -39,8 +51,9 @@ function cacheElements() {
   elements.propertySelectionInfo = document.getElementById('propertySelectionInfo');
   elements.description = document.getElementById('description');
   elements.slotDuration = document.getElementById('slotDuration');
-  elements.addSlotButton = document.getElementById('addSlotButton');
-  elements.slotsContainer = document.getElementById('slotsContainer');
+  elements.searchDate = document.getElementById('searchDate');
+  elements.searchStartTime = document.getElementById('searchStartTime');
+  elements.searchEndTime = document.getElementById('searchEndTime');
   elements.submitButton = document.getElementById('submitButton');
   elements.availabilityCard = document.getElementById('availabilityCard');
   elements.availabilityInfo = document.getElementById('availabilityInfo');
@@ -63,27 +76,6 @@ function bindEvents() {
     if (!elements.propertyResults.contains(event.target) && event.target !== elements.propertySearch) {
       clearPropertySuggestions();
     }
-  });
-
-  elements.addSlotButton?.addEventListener('click', () => addSlotRow());
-  elements.slotsContainer?.addEventListener('click', (event) => {
-    const removeButton = event.target.closest('[data-action="remove-slot"]');
-    if (!removeButton) return;
-    const slotId = removeButton.getAttribute('data-slot-id');
-    removeSlotRow(slotId);
-  });
-
-  elements.slotsContainer?.addEventListener('change', (event) => {
-    const row = event.target.closest('[data-slot-id]');
-    if (!row) return;
-    const slotId = row.getAttribute('data-slot-id');
-    if (event.target.matches('[data-field="start"]')) {
-      updateSlotEndByDuration(slotId);
-    }
-  });
-
-  elements.slotDuration?.addEventListener('change', () => {
-    state.slots.forEach((slot) => updateSlotEndByDuration(slot.id));
   });
 
   elements.loadMoreButton?.addEventListener('click', () => renderMoreAvailability());
@@ -166,49 +158,6 @@ function clearPropertySuggestions() {
   elements.propertyResults.innerHTML = '';
 }
 
-function addSlotRow(slot = {}) {
-  const slotId = crypto.randomUUID();
-  const today = new Date();
-  const defaultDate = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, '0')}-${String(today.getUTCDate()).padStart(2, '0')}`;
-  state.slots.push({ id: slotId });
-
-  const row = document.createElement('div');
-  row.className = 'slot-row';
-  row.setAttribute('data-slot-id', slotId);
-  row.innerHTML = `
-    <input type="date" data-field="date" value="${slot.date || defaultDate}" required />
-    <input type="time" data-field="start" value="${slot.start || DEFAULT_SLOT_START}" required />
-    <input type="time" data-field="end" value="${slot.end || ''}" required />
-    <button type="button" class="remove" data-action="remove-slot" data-slot-id="${slotId}">Entfernen</button>
-  `;
-
-  elements.slotsContainer.appendChild(row);
-  updateSlotEndByDuration(slotId, { force: !slot.end });
-}
-
-function removeSlotRow(slotId) {
-  if (state.slots.length <= 1) {
-    setStatus('Mindestens ein Zeitfenster muss vorhanden bleiben.', true);
-    return;
-  }
-
-  state.slots = state.slots.filter((slot) => slot.id !== slotId);
-  const row = elements.slotsContainer.querySelector(`[data-slot-id="${slotId}"]`);
-  row?.remove();
-}
-
-function updateSlotEndByDuration(slotId, options = {}) {
-  const row = elements.slotsContainer.querySelector(`[data-slot-id="${slotId}"]`);
-  if (!row) return;
-  const startInput = row.querySelector('[data-field="start"]');
-  const endInput = row.querySelector('[data-field="end"]');
-  if (!startInput || !endInput) return;
-  const durationHours = parseFloat(elements.slotDuration.value || String(DEFAULT_DURATION_HOURS));
-  if (!startInput.value || !Number.isFinite(durationHours) || durationHours <= 0) return;
-  if (endInput.value && !options.force) return;
-  endInput.value = addHoursToTime(startInput.value, durationHours);
-}
-
 async function handleSubmit(event) {
   event.preventDefault();
   if (state.isSubmitting) return;
@@ -220,13 +169,13 @@ async function handleSubmit(event) {
     hideAvailability();
 
     const payload = collectAndValidateForm();
-    const matches = await findAvailableTechnicians(payload.slots);
+    const matches = await findAvailabilitySuggestions(payload);
     state.pendingPayload = payload;
     state.availabilityOptions = matches;
     state.availabilityOffset = 0;
 
     if (!matches.length) {
-      setStatus('Für die angegebenen Zeitfenster wurde kein verfügbarer Monteur gefunden.', true);
+      setStatus('Für die Suchkriterien wurden keine verfügbaren Termine gefunden.', true);
       return;
     }
 
@@ -254,77 +203,108 @@ function collectAndValidateForm() {
     throw new Error('Die Dauer des Zeitfensters muss größer als 0 sein.');
   }
 
-  const slotRows = [...elements.slotsContainer.querySelectorAll('[data-slot-id]')];
-  const slots = slotRows.map((row, index) => {
-    const dateInput = row.querySelector('[data-field="date"]');
-    const startInput = row.querySelector('[data-field="start"]');
-    const endInput = row.querySelector('[data-field="end"]');
-    if (!dateInput || !startInput || !endInput) {
-      throw new Error(`Zeitfenster ${index + 1} ist beschädigt. Bitte Zeile entfernen und neu anlegen.`);
-    }
-    const date = dateInput.value;
-    const start = startInput.value;
-    const end = endInput.value;
-    if (!date || !start || !end) {
-      throw new Error(`Zeitfenster ${index + 1} ist unvollständig.`);
-    }
-    if (start >= end) {
-      throw new Error(`Zeitfenster ${index + 1} ist ungültig: Ende muss nach Start liegen.`);
-    }
-    return { index, date, start, end };
-  });
+  const searchDate = String(elements.searchDate?.value || '').trim();
+  if (!searchDate) {
+    throw new Error('Bitte ein Startdatum für die Suche festlegen.');
+  }
 
-  if (!slots.length) {
-    throw new Error('Bitte mindestens ein Zeitfenster erfassen.');
+  const searchStart = String(elements.searchStartTime?.value || '').trim();
+  const searchEnd = String(elements.searchEndTime?.value || '').trim();
+  if (!searchStart || !searchEnd) {
+    throw new Error('Bitte den Suchrahmen mit Start- und Endzeit eintragen.');
+  }
+  if (searchStart >= searchEnd) {
+    throw new Error('Der Suchrahmen ist ungültig: "von" muss vor "bis" liegen.');
+  }
+
+  const durationMinutes = Math.round(durationHours * 60);
+  if (durationMinutes > diffMinutes(searchStart, searchEnd)) {
+    throw new Error('Die Dauer passt nicht in den gewählten Suchrahmen.');
   }
 
   return {
     property: state.selectedProperty,
     description,
     durationHours,
-    slots,
+    durationMinutes,
+    searchDate,
+    searchStart,
+    searchEnd,
   };
 }
 
-async function findAvailableTechnicians(slots) {
+async function findAvailabilitySuggestions(payload) {
   const technicians = await loadTechnicians();
   if (!technicians.length) return [];
 
-  const uniqueDates = [...new Set(slots.map((slot) => slot.date))].sort();
-  const minDate = uniqueDates[0];
-  const maxDate = uniqueDates[uniqueDates.length - 1];
+  const searchDates = buildSearchDates(payload.searchDate, SEARCH_MAX_DAYS);
+  const minDate = searchDates[0];
+  const maxDate = searchDates[searchDates.length - 1];
+  const technicianIds = technicians.map((technician) => technician.id);
 
   const [assignments, absences, holidays] = await Promise.all([
-    loadAssignments(technicians.map((technician) => technician.id), uniqueDates),
-    loadAbsences(technicians.map((technician) => technician.id), minDate, maxDate),
-    loadPlatformHolidays(uniqueDates),
+    loadAssignments(technicianIds, minDate, maxDate),
+    loadAbsences(technicianIds, minDate, maxDate),
+    loadPlatformHolidays(searchDates),
   ]);
 
   const matches = [];
-  const sortedSlots = [...slots].sort(compareSlotDateTime);
+  const durationMinutes = payload.durationMinutes;
 
-  for (const slot of sortedSlots) {
-    if (holidays.has(slot.date)) {
+  for (const date of searchDates) {
+    if (matches.length >= SEARCH_MAX_RESULTS) break;
+    if (holidays.has(date)) {
       continue;
     }
-    for (const technician of technicians) {
-      const hasAbsence = absences.some((absence) => absence.profile_id === technician.id && slot.date >= absence.start_date && slot.date <= absence.end_date);
-      if (hasAbsence) continue;
 
-      const hasOverlap = assignments.some((assignment) => {
-        if (assignment.profile_id !== technician.id || assignment.assignment_date !== slot.date) {
-          return false;
-        }
-        return assignment.start_time < slot.end && assignment.end_time > slot.start;
+    const daySlots = buildDaySlots(date, payload.searchStart, payload.searchEnd, durationMinutes);
+    for (const slot of daySlots) {
+      if (matches.length >= SEARCH_MAX_RESULTS) break;
+      const matchedTechnician = technicians.find((technician) => {
+        const hasAbsence = absences.some((absence) => absence.profile_id === technician.id && slot.date >= absence.start_date && slot.date <= absence.end_date);
+        if (hasAbsence) return false;
+
+        const hasOverlap = assignments.some((assignment) => {
+          if (assignment.profile_id !== technician.id || assignment.assignment_date !== slot.date) {
+            return false;
+          }
+          return assignment.start_time < slot.end && assignment.end_time > slot.start;
+        });
+        return !hasOverlap;
       });
 
-      if (!hasOverlap) {
-        matches.push({ slot, technician });
+      if (matchedTechnician) {
+        matches.push({ slot, technician: matchedTechnician });
       }
     }
   }
 
   return matches;
+}
+
+function buildSearchDates(startDateIso, days) {
+  const startDate = parseIsoDate(startDateIso);
+  const dates = [];
+  for (let i = 0; i < days; i += 1) {
+    const date = new Date(startDate);
+    date.setUTCDate(startDate.getUTCDate() + i);
+    dates.push(formatIsoDate(date));
+  }
+  return dates;
+}
+
+function buildDaySlots(date, searchStart, searchEnd, durationMinutes) {
+  const slots = [];
+  const searchStartMinutes = timeToMinutes(searchStart);
+  const searchEndMinutes = timeToMinutes(searchEnd);
+  for (let start = searchStartMinutes; start + durationMinutes <= searchEndMinutes; start += SEARCH_STEP_MINUTES) {
+    slots.push({
+      date,
+      start: minutesToTime(start),
+      end: minutesToTime(start + durationMinutes),
+    });
+  }
+  return slots;
 }
 
 async function loadTechnicians() {
@@ -342,12 +322,13 @@ async function loadTechnicians() {
   });
 }
 
-async function loadAssignments(profileIds, dates) {
+async function loadAssignments(profileIds, minDate, maxDate) {
   const { data, error } = await state.supabase
     .from('daily_assignments')
     .select('profile_id,assignment_date,start_time,end_time')
     .in('profile_id', profileIds)
-    .in('assignment_date', dates);
+    .gte('assignment_date', minDate)
+    .lte('assignment_date', maxDate);
   if (error) throw error;
   return data || [];
 }
@@ -505,7 +486,7 @@ function renderMoreAvailability(options = {}) {
         <strong>Option ${optionIndex + 1}: ${formatDate(option.slot.date)} · ${option.slot.start}–${option.slot.end}</strong>
         <p class="availability-item-meta">Monteur: ${escapeHtml(option.technician.full_name)}</p>
       </div>
-      <button type="button" data-action="book-option" data-option-index="${optionIndex}">Diesen Termin wählen</button>
+      <button type="button" data-action="book-option" data-option-index="${optionIndex}">Buchen</button>
     `;
     fragment.appendChild(card);
   });
@@ -537,7 +518,7 @@ async function handleBookOption(event) {
     setStatus('Lege Auftrag für gewählten Termin an…', false);
     const bookingResult = await createBooking(state.pendingPayload, match);
     showResult(bookingResult);
-    setStatus('Buchung erfolgreich erstellt und eingeplant.', false);
+    setStatus(`Buchung erfolgreich erstellt. Auftragsnummer: ${bookingResult.project.commission_number}`, false);
   } catch (error) {
     setStatus(`Fehler: ${error.message}`, true);
   } finally {
@@ -548,7 +529,9 @@ async function handleBookOption(event) {
 function setSubmitting(isSubmitting) {
   state.isSubmitting = isSubmitting;
   elements.submitButton.disabled = isSubmitting;
-  elements.addSlotButton.disabled = isSubmitting;
+  elements.searchDate.disabled = isSubmitting;
+  elements.searchStartTime.disabled = isSubmitting;
+  elements.searchEndTime.disabled = isSubmitting;
   elements.loadMoreButton.disabled = isSubmitting;
   elements.availabilityList.querySelectorAll('[data-action="book-option"]').forEach((button) => {
     button.disabled = isSubmitting;
@@ -566,26 +549,33 @@ function propertyLabel(property) {
   return `${property.name} · ${property.strasse}, ${property.postleitzahl} ${property.ort}`;
 }
 
-function addHoursToTime(timeValue, hoursToAdd) {
-  const [hourPart, minutePart] = timeValue.split(':').map(Number);
-  const startMinutes = hourPart * 60 + minutePart;
-  const nextMinutes = (startMinutes + Math.round(hoursToAdd * 60)) % (24 * 60);
-  const hours = Math.floor(nextMinutes / 60);
-  const minutes = nextMinutes % 60;
-  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-}
-
 function formatDate(dateValue) {
   const [year, month, day] = dateValue.split('-').map(Number);
   return `${String(day).padStart(2, '0')}.${String(month).padStart(2, '0')}.${year}`;
 }
 
-function compareSlotDateTime(a, b) {
-  const dateCompare = a.date.localeCompare(b.date);
-  if (dateCompare !== 0) return dateCompare;
-  const startCompare = a.start.localeCompare(b.start);
-  if (startCompare !== 0) return startCompare;
-  return a.end.localeCompare(b.end);
+function diffMinutes(startTime, endTime) {
+  return timeToMinutes(endTime) - timeToMinutes(startTime);
+}
+
+function timeToMinutes(timeValue) {
+  const [hourPart, minutePart] = String(timeValue).split(':').map(Number);
+  return hourPart * 60 + minutePart;
+}
+
+function minutesToTime(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+function parseIsoDate(isoDate) {
+  const [year, month, day] = String(isoDate).split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function formatIsoDate(date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
 }
 
 function escapeHtml(value) {
